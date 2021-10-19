@@ -1,7 +1,8 @@
 import sys
 
-import gnina
 import molgrid
+
+import gnina
 
 
 def test_gnina_imported():

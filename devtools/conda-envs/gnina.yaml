@@ -15,6 +15,7 @@ dependencies:
   - black
   - mypy
   - flake8
+  - isort
 
   - pytorch=1.9
   - torchvision

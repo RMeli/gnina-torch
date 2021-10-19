@@ -3,7 +3,9 @@ gnina
 PyTorch implementation of GNINA
 """
 import sys
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
+
 import versioneer
 
 short_description = "PyTorch implementation of GNINA".split("\n")[0]
@@ -15,7 +17,7 @@ pytest_runner = ["pytest-runner"] if needs_pytest else []
 try:
     with open("README.md", "r") as handle:
         long_description = handle.read()
-except:
+except Exception:
     long_description = None
 
 

@@ -1,0 +1,26 @@
+name: gninatorch
+channels:
+  - conda-forge
+  - defaults
+  - pytorch
+  - nvidia
+dependencies:
+  - python
+  - pip
+  - ipython
+
+  - pytest
+  - pytest-cov
+  - codecov
+  - black
+  - mypy
+  - flake8
+  - isort
+
+  - pytorch=1.9
+  - torchvision
+  - cudatoolkit=11.1
+
+  - pip:
+    - molgrid
+

@@ -42,11 +42,11 @@ jobs:
     - uses: conda-incubator/setup-miniconda@v2
       with:
         python-version: ${{ matrix.python-version }}
-        environment-file: devtools/conda-envs/test_env.yaml
+        environment-file: devtools/conda-envs/gnina.yaml
 
         channels: conda-forge,defaults
 
-        activate-environment: test
+        activate-environment: gninatorch
         auto-update-conda: false
         auto-activate-base: false
         show-channel-urls: true

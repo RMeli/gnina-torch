@@ -2,6 +2,7 @@ from collections import OrderedDict
 from typing import Tuple, Union
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 
@@ -281,31 +282,38 @@ class DenseBlock(nn.Module):
     ----------
     in_features: int
         Input features for the first layer
-    out_features: int
-        Output features for all convolutional layers
-    num_convs: int
+    num_block_features: int
+        Number of output features (channels) for the convolutional layers
+    num_block_convs: int
         Number of convolutions
     tag: Union[int, str]
         Tag identifying the DenseBlock
+
+    Notes
+    -----
+    The total number of output features corresponds tothe input features concatenated
+    together with all subsequent :code:`num_block_features` produced by the
+    convolutional layers (:code:`num_block_convs` times).
     """
 
     def __init__(
         self,
         in_features: int,
-        block_features: int = 16,
-        num_convs: int = 4,
+        num_block_features: int = 16,
+        num_block_convs: int = 4,
         tag: Union[int, str] = "",
-    ):
+    ) -> None:
 
         super().__init__()
 
         self.blocks = nn.ModuleList()
 
-        self.block_features = block_features
-        self.num_convs = num_convs
+        self.in_features = in_features
+        self.num_block_features = num_block_features
+        self.num_block_convs = num_block_convs
 
         in_features_layer = in_features
-        for idx in range(num_convs):
+        for idx in range(num_block_convs):
             block: OrderedDict[str, nn.Module] = OrderedDict()
             block[f"data_enc_level{tag}_batchnorm_conv{idx}"] = nn.BatchNorm3d(
                 in_features_layer,
@@ -313,7 +321,7 @@ class DenseBlock(nn.Module):
             )
             block[f"data_enc_level{tag}_conv{idx}"] = nn.Conv3d(
                 in_channels=in_features_layer,
-                out_channels=block_features,
+                out_channels=num_block_features,
                 kernel_size=3,
                 padding=1,
             )
@@ -322,7 +330,7 @@ class DenseBlock(nn.Module):
             self.blocks.append(nn.Sequential(block))
 
             # The next layer takes all previous features as input
-            in_features_layer += block_features
+            in_features_layer += num_block_features
 
         # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
@@ -330,7 +338,10 @@ class DenseBlock(nn.Module):
             if isinstance(m, nn.Conv3d):
                 nn.init.xavier_uniform_(m.weight.data)
 
-    def forward(self, x: torch.Tensor):
+    def out_features(self) -> int:
+        return self.in_features + self.num_block_features * self.num_block_convs
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Parameters
         ----------
@@ -356,3 +367,113 @@ class DenseBlock(nn.Module):
             x = torch.cat(outputs, dim=1)
 
         return x
+
+
+class Dense(nn.Module):
+    def __init__(
+        self, input_dims: Tuple, num_blocks=3, num_block_features=16, num_block_convs=4
+    ):
+
+        super().__init__()
+
+        self.input_dims = input_dims
+
+        features: OrderedDict[str, nn.Module] = OrderedDict(
+            [
+                ("data_enc_init_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
+                (
+                    "data_enc_init_conv",
+                    nn.Conv3d(
+                        in_channels=input_dims[0],
+                        out_channels=32,
+                        kernel_size=3,
+                        stride=1,
+                        padding=1,
+                    ),
+                ),
+                ("data_enc_init_conv_relu", nn.ReLU()),
+            ]
+        )
+
+        out_features = 32
+        for idx in range(num_blocks - 1):
+            in_features = out_features
+
+            # Dense block
+            features[f"dense_block_{idx}"] = DenseBlock(
+                in_features,
+                num_block_features=num_block_features,
+                num_block_convs=num_block_convs,
+                tag=idx,
+            )
+
+            # Number of output features from dense block
+            print(type(features[f"dense_block_{idx}"]))
+            out_features = features[f"dense_block_{idx}"].out_features()
+
+            features[f"data_enc_level{idx}_bottleneck"] = nn.Conv3d(
+                in_channels=out_features,
+                out_channels=out_features,
+                kernel_size=1,
+                padding=0,
+            )
+            features[f"data_enc_level{idx+1}_pool"] = nn.MaxPool3d(
+                kernel_size=2, stride=2
+            )
+
+        in_features = out_features
+        features[f"dense_block_{num_blocks-1}"] = DenseBlock(
+            in_features,
+            num_block_features=num_block_features,
+            num_block_convs=num_block_convs,
+            tag=num_blocks - 1,
+        )
+        self.features_out_size = features[f"dense_block_{num_blocks-1}"].out_features()
+
+        self.features = nn.Sequential(features)
+
+        self.pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
+            )
+        )
+
+        # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
+        # Xavier initialization for convolutional and linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight.data)
+
+    def forward(self, x):
+        x = self.features(x)
+
+        # Global MAX pooling
+        (
+            B,
+            C,
+            D,
+            H,
+            W,
+        ) = x.size()
+        x = F.max_pool3d(x, (D, H, W)).view(B, C)
+
+        pose_raw = self.pose(x)
+        affinity = self.affinity(x)
+
+        return pose_raw, affinity

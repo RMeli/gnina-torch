@@ -6,8 +6,8 @@ import gnina
 
 
 def test_gnina_imported():
-    assert "gnina" in sys.modules
+    assert gnina.__name__ in sys.modules
 
 
 def test_molgrid_imported():
-    assert "molgrid" in sys.modules
+    assert molgrid.__name__ in sys.modules

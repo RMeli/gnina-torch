@@ -9,12 +9,12 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @pytest.fixture
 def batch_size():
-    return 16
+    return 4
 
 
 @pytest.fixture
 def dims():
-    return (32, 48, 48, 48)
+    return (12, 24, 24, 24)
 
 
 @pytest.fixture
@@ -36,6 +36,24 @@ def test_default2018_forward(batch_size, dims, x):
 
     assert pose_raw.shape == (batch_size, 2)
     assert affinity.shape == (batch_size, 1)
+
+
+@pytest.mark.parametrize("num_block_convs", [1, 4])
+@pytest.mark.parametrize("num_block_features", [2, 16])
+def test_denseblock_forward_small(batch_size, x, num_block_features, num_block_convs):
+    in_features = x.shape[1]
+
+    block = DenseBlock(
+        in_features,
+        num_block_features=num_block_features,
+        num_block_convs=num_block_convs,
+    ).to(device)
+    x = block(x)
+
+    # in_features from input
+    # block_features for each of the convolutional layers
+    assert x.shape[1] == num_block_features * num_block_convs + in_features
+    assert x.shape[1] == block.out_features()
 
 
 @pytest.mark.parametrize("num_block_convs", [1, 4])

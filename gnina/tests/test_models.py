@@ -1,26 +1,29 @@
-import torch
 import pytest
+import torch
 
-from gnina.models import Default2017, Default2018
+from gnina.models import Default2017, Default2018, Dense, DenseBlock
+
+# TODO: Allow to deactivate cuda when running tests
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 @pytest.fixture
 def batch_size():
-    return 16
+    return 4
 
 
 @pytest.fixture
 def dims():
-    return (32, 48, 48, 48)
+    return (12, 24, 24, 24)
 
 
 @pytest.fixture
 def x(batch_size, dims):
-    return torch.normal(mean=0, std=1, size=(batch_size, *dims))
+    return torch.normal(mean=0, std=1, size=(batch_size, *dims), device=device)
 
 
 def test_default2017_forward(batch_size, dims, x):
-    model = Default2017(input_dims=dims)
+    model = Default2017(input_dims=dims).to(device)
     pose_raw, affinity = model(x)
 
     assert pose_raw.shape == (batch_size, 2)
@@ -28,7 +31,58 @@ def test_default2017_forward(batch_size, dims, x):
 
 
 def test_default2018_forward(batch_size, dims, x):
-    model = Default2018(input_dims=dims)
+    model = Default2018(input_dims=dims).to(device)
+    pose_raw, affinity = model(x)
+
+    assert pose_raw.shape == (batch_size, 2)
+    assert affinity.shape == (batch_size, 1)
+
+
+@pytest.mark.parametrize("num_block_convs", [1, 4])
+@pytest.mark.parametrize("num_block_features", [2, 16])
+def test_denseblock_forward_small(batch_size, x, num_block_features, num_block_convs):
+    in_features = x.shape[1]
+
+    block = DenseBlock(
+        in_features,
+        num_block_features=num_block_features,
+        num_block_convs=num_block_convs,
+    ).to(device)
+    x = block(x)
+
+    # in_features from input
+    # block_features for each of the convolutional layers
+    assert x.shape[1] == num_block_features * num_block_convs + in_features
+    assert x.shape[1] == block.out_features()
+
+
+@pytest.mark.parametrize("num_block_convs", [1, 4])
+@pytest.mark.parametrize("num_block_features", [8, 16])
+def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs):
+    in_features = x.shape[1]
+
+    block = DenseBlock(
+        in_features,
+        num_block_features=num_block_features,
+        num_block_convs=num_block_convs,
+    ).to(device)
+    x = block(x)
+
+    # in_features from input
+    # block_features for each of the convolutional layers
+    assert x.shape[1] == num_block_features * num_block_convs + in_features
+    assert x.shape[1] == block.out_features()
+
+
+@pytest.mark.parametrize("num_block_convs", [1, 4])
+@pytest.mark.parametrize("num_block_features", [8, 16])
+def test_dense_forward(batch_size, x, dims, num_block_features, num_block_convs):
+    model = Dense(
+        input_dims=dims,
+        num_blocks=3,
+        num_block_features=num_block_features,
+        num_block_convs=num_block_convs,
+    ).to(device)
     pose_raw, affinity = model(x)
 
     assert pose_raw.shape == (batch_size, 2)

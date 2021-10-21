@@ -52,11 +52,7 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot):
     # This ensures reproducibility
     args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
 
-    # --no_shuffle allows to deactivate random shuffling
-    # Within the code, the meaning of this varibale is inverted
-    # no_shuffle is True when we want to shuffle (default)
-    # no_shuffle is False when we do not want to shuffle
-    assert not args.no_shuffle
+    assert not args.shuffle
 
     e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
 
@@ -74,11 +70,7 @@ def test_example_provider(trainfile, dataroot):
     # This ensures reproducibility
     args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
 
-    # --no_shuffle allows to deactivate random shuffling
-    # Within the code, the meaning of this varibale is inverted
-    # no_shuffle is True when we want to shuffle (default)
-    # no_shuffle is False when we do not want to shuffle
-    assert not args.no_shuffle
+    assert not args.shuffle
 
     e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
 
@@ -109,11 +101,7 @@ def test_grid_maker(trainfile, dataroot):
     # This ensures reproducibility
     args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
 
-    # --no_shuffle allows to deactivate random shuffling
-    # Within the code, the meaning of this varibale is inverted
-    # no_shuffle is True when we want to shuffle (default)
-    # no_shuffle is False when we do not want to shuffle
-    assert not args.no_shuffle
+    assert not args.shuffle
 
     e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
 

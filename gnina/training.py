@@ -38,6 +38,7 @@ def options(args: Optional[List[str]] = None):
         "--no_shuffle",
         action="store_false",
         help="Deactivate random shuffling of samples",
+        dest="shuffle",  # Variable name (shuffle is False when --no_shuffle is used)
     )
     parser.add_argument(
         "--label_pos", type=int, default=0, help="Pose label position in training file"
@@ -83,13 +84,8 @@ def _setup_example_provider_and_grid_maker(
         Initialized :code:`molgrid.ExampleProvider`, :code:`molgrid.GridMaker` and grid
         dimensions
     """
-    # --no_shuffle is false when the argument is used
-    # --no_shuffle is True by default
-    # The meaning of no_shuffle is inverted in the code
-    # no_shuffle is True when we want to shuffle (default)
-    # no_shuffle is False when we do not want to shuffle
     example_provider = molgrid.ExampleProvider(
-        data_root=args.data_root, balanced=args.balanced, shuffle=args.no_shuffle
+        data_root=args.data_root, balanced=args.balanced, shuffle=args.shuffle
     )
     example_provider.populate(args.trainfile)
 

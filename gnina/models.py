@@ -503,3 +503,10 @@ class Dense(nn.Module):
         affinity = self.affinity(x)
 
         return pose_raw, affinity
+
+
+models_dict = {
+    "default2017": Default2017,
+    "default2018": Default2018,
+    "dense": Dense,
+}

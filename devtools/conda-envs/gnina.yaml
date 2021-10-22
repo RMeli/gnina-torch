@@ -18,9 +18,9 @@ dependencies:
   - isort
 
   - pytorch=1.9
+  - ignite
   - torchvision
   - cudatoolkit=11.1
 
   - pip:
     - molgrid
-

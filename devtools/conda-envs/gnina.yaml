@@ -17,10 +17,10 @@ dependencies:
   - flake8
   - isort
 
-  - pytorch=1.9
+  - pytorch=1.10
+  - ignite
   - torchvision
   - cudatoolkit=11.1
 
   - pip:
     - molgrid
-

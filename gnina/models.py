@@ -2,6 +2,7 @@ from collections import OrderedDict
 from typing import Tuple, Union
 
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 
@@ -13,19 +14,24 @@ class Default2017(nn.Module):
     ----------
     input_dims: tuple
         Model input dimensions (channels, depth, height, width)
+    affinity: bool
+        Enable affinity prediction (alongside pose prediction)
 
     Notes
     -----
     This architectre was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2017.model
+
+    The main difference is that the PyTorech implementation resurns the log softmax.
     """
 
-    def __init__(self, input_dims: Tuple):
+    def __init__(self, input_dims: Tuple, affinity: bool = True):
 
         super().__init__()
 
         self.input_dims = input_dims
+        self.predict_affinity = affinity
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -88,16 +94,19 @@ class Default2017(nn.Module):
             )
         )
 
-        self.affinity = nn.Sequential(
-            OrderedDict(
-                [
-                    (
-                        "affinity_output",
-                        nn.Linear(in_features=self.features_out_size, out_features=1),
-                    )
-                ]
+        if self.predict_affinity:
+            self.affinity = nn.Sequential(
+                OrderedDict(
+                    [
+                        (
+                            "affinity_output",
+                            nn.Linear(
+                                in_features=self.features_out_size, out_features=1
+                            ),
+                        )
+                    ]
+                )
             )
-        )
 
         # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
@@ -114,17 +123,20 @@ class Default2017(nn.Module):
 
         Notes
         -----
-        The pose score is the raw output of a linear layer. Softmax is applied with the
-        loss.
+        The pose score is the log softmax of the output of the last linear layer.
         """
 
         x = self.features(x)
         x = x.view(-1, self.features_out_size)
 
         pose_raw = self.pose(x)
-        affinity = self.affinity(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
 
-        return pose_raw, affinity
+        if self.predict_affinity:
+            affinity = self.affinity(x)
+            return pose_log, affinity
+        else:
+            return pose_log
 
 
 class Default2018(nn.Module):
@@ -135,19 +147,24 @@ class Default2018(nn.Module):
     ----------
     input_dims: tuple
         Model input dimensions (channels, depth, height, width)
+    affinity: bool
+        Enable affinity prediction (alongside pose prediction)
 
     Notes
     -----
     This architectre was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
+
+    The main difference is that the PyTorech implementation resurns the log softmax.
     """
 
-    def __init__(self, input_dims: Tuple):
+    def __init__(self, input_dims: Tuple, affinity: bool = True):
 
         super().__init__()
 
         self.input_dims = input_dims
+        self.predict_affinity = affinity
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -234,16 +251,19 @@ class Default2018(nn.Module):
             )
         )
 
-        self.affinity = nn.Sequential(
-            OrderedDict(
-                [
-                    (
-                        "affinity_output",
-                        nn.Linear(in_features=self.features_out_size, out_features=1),
-                    )
-                ]
+        if self.predict_affinity:
+            self.affinity = nn.Sequential(
+                OrderedDict(
+                    [
+                        (
+                            "affinity_output",
+                            nn.Linear(
+                                in_features=self.features_out_size, out_features=1
+                            ),
+                        )
+                    ]
+                )
             )
-        )
 
         # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
@@ -260,17 +280,20 @@ class Default2018(nn.Module):
 
         Notes
         -----
-        The pose score is the raw output of a linear layer. Softmax is applied with the
-        loss.
+        The pose score is the log softmax of the output of the last linear layer.
         """
 
         x = self.features(x)
         x = x.view(-1, self.features_out_size)
 
         pose_raw = self.pose(x)
-        affinity = self.affinity(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
 
-        return pose_raw, affinity
+        if self.predict_affinity:
+            affinity = self.affinity(x)
+            return pose_log, affinity
+        else:
+            return pose_log
 
 
 class DenseBlock(nn.Module):
@@ -383,6 +406,9 @@ class Dense(nn.Module):
     Original implementation by Andrew McNutt available here:
 
         https://github.com/gnina/models/blob/master/pytorch/dense_model.py
+
+    The main difference is that the original implementation resurns the raw output of
+    the last linear layer while here the output is the log softmax of the last linear.
     """
 
     def __init__(
@@ -391,11 +417,13 @@ class Dense(nn.Module):
         num_blocks: int = 3,
         num_block_features: int = 16,
         num_block_convs: int = 4,
+        affinity: bool = True,
     ) -> None:
 
         super().__init__()
 
         self.input_dims = input_dims
+        self.predict_affinity = affinity
 
         features: OrderedDict[str, nn.Module] = OrderedDict(
             [
@@ -475,16 +503,19 @@ class Dense(nn.Module):
             )
         )
 
-        self.affinity = nn.Sequential(
-            OrderedDict(
-                [
-                    (
-                        "affinity_output",
-                        nn.Linear(in_features=self.features_out_size, out_features=1),
-                    )
-                ]
+        if self.predict_affinity:
+            self.affinity = nn.Sequential(
+                OrderedDict(
+                    [
+                        (
+                            "affinity_output",
+                            nn.Linear(
+                                in_features=self.features_out_size, out_features=1
+                            ),
+                        )
+                    ]
+                )
             )
-        )
 
         # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
@@ -493,6 +524,16 @@ class Dense(nn.Module):
                 nn.init.xavier_uniform_(m.weight.data)
 
     def forward(self, x):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
         x = self.features(x)
 
         # Reshape based on number of channels
@@ -500,9 +541,15 @@ class Dense(nn.Module):
         x = x.view(-1, self.features_out_size)
 
         pose_raw = self.pose(x)
-        affinity = self.affinity(x)
 
-        return pose_raw, affinity
+        pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        if self.predict_affinity:
+            affinity = self.affinity(x)
+            return pose_log, affinity
+        else:
+            return pose_log
 
 
 models_dict = {

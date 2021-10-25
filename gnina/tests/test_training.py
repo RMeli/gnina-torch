@@ -67,7 +67,9 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot):
 def test_example_provider(trainfile, dataroot):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
-    args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
+    args = training.options(
+        [trainfile, "-d", dataroot, "--no_shuffle", "--affinity_pos", "1"]
+    )
 
     assert not args.shuffle
 
@@ -121,6 +123,42 @@ def test_grid_maker(trainfile, dataroot):
 def test_training(trainfile, dataroot):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
-    args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
+    args = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "1",
+            "--test_every",
+            "2",
+            "--iterations",
+            "5",
+        ]
+    )
+
+    training.training(args)
+
+
+def test_training_with_test(trainfile, dataroot):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfile,
+            "--testfile",
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "1",
+            "--test_every",
+            "2",
+            "--iterations",
+            "5",
+        ]
+    )
 
     training.training(args)

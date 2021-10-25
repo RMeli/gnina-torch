@@ -1,3 +1,18 @@
+"""
+GNINA Caffe models translated to PyTorch.
+
+Notes
+-----
+The PyTorch models try to follow the original Caffe models as much as possible. However,
+some changes are necessary.
+
+The :code:`MolDataLayer` is now separated from the model and the parameters are
+controlled by CLI arguments in the training process.
+
+The model output for pose prediction corresponds to the log softmax of the last fully-
+connected layer instead of the softmax.
+"""
+
 from collections import OrderedDict
 from typing import Tuple, Union
 

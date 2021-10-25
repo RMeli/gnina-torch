@@ -1,5 +1,5 @@
 import argparse
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import molgrid
 import numpy as np
@@ -28,6 +28,7 @@ def options(args: Optional[List[str]] = None):
     # Data
     # TODO: Allow multiple train files?
     parser.add_argument("trainfile", type=str, help="Training file")
+    parser.add_argument("--testfile", type=str, default=None, help="Test file")
     parser.add_argument(
         "-d",
         "--data_root",
@@ -50,7 +51,7 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "--affinity_pos",
         type=int,
-        default=1,
+        default=None,
         help="Affinity value position in training file",
     )
 
@@ -64,8 +65,32 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "--base_lr", type=float, default=0.01, help="Base (initial) learning rate"
     )
+    parser.add_argument("--momentum", type=float, default=0.9, help="Momentum")
+    parser.add_argument(
+        "--weight_decay", type=float, help="Weight decay", default=0.001
+    )
+    parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
+    parser.add_argument(
+        "--no_random_rotation",
+        action="store_false",
+        help="Deactivate random rotation of samples",
+        dest="random_rotation",
+    )
+    parser.add_argument(
+        "--random_translation", type=int, default=6.0, help="Random translation"
+    )
+    parser.add_argument(
+        "-i",
+        "--iterations",
+        type=int,
+        default=250000,
+        help="Number of iterations (epochs)",
+    )
 
     # Misc
+    parser.add_argument(
+        "-t", "--test_every", type=int, default=1000, help="Test interval"
+    )
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
 
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
@@ -75,7 +100,10 @@ def options(args: Optional[List[str]] = None):
 
 def _setup_example_provider_and_grid_maker(
     args,
-) -> Tuple[molgrid.ExampleProvider, molgrid.GridMaker]:
+) -> Union[
+    Tuple[molgrid.ExampleProvider, molgrid.GridMaker],
+    Tuple[molgrid.ExampleProvider, molgrid.ExampleProvider, molgrid.GridMaker],
+]:
     """
     Setup :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker` based on command
     line arguments.
@@ -91,14 +119,23 @@ def _setup_example_provider_and_grid_maker(
         Initialized :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker`
         dimensions
     """
-    example_provider = molgrid.ExampleProvider(
+    train_example_provider = molgrid.ExampleProvider(
         data_root=args.data_root, balanced=args.balanced, shuffle=args.shuffle
     )
-    example_provider.populate(args.trainfile)
+    train_example_provider.populate(args.trainfile)
 
     grid_maker = molgrid.GridMaker()
 
-    return example_provider, grid_maker
+    if args.testfile is not None:
+        # Test example do not need to be balanced or shuffled
+        test_example_provider = molgrid.ExampleProvider(
+            data_root=args.data_root, balanced=False, shuffle=False
+        )
+        test_example_provider.populate(args.testfile)
+
+        return train_example_provider, test_example_provider, grid_maker
+    else:
+        return train_example_provider, grid_maker
 
 
 def training(args):
@@ -111,31 +148,65 @@ def training(args):
     # Set device
     device = torch.device(args.gpu)
 
-    example_provider, grid_maker = _setup_example_provider_and_grid_maker(args)
+    if args.testfile is not None:
+        (
+            train_example_provider,
+            test_example_provider,
+            grid_maker,
+        ) = _setup_example_provider_and_grid_maker(args)
+    else:
+        train_example_provider, grid_maker = _setup_example_provider_and_grid_maker(
+            args
+        )
 
     train_loader = GriddedExamplesLoader(
-        batch_size=1,
-        example_provider=example_provider,
+        batch_size=args.batch_size,
+        example_provider=train_example_provider,
         grid_maker=grid_maker,
-        random_translation=0.0,
-        random_rotation=False,
+        random_translation=args.random_translation,
+        random_rotation=args.random_rotation,
     )
+
+    if args.testfile is not None:
+        test_loader = GriddedExamplesLoader(
+            batch_size=args.batch_size,
+            example_provider=test_example_provider,
+            grid_maker=grid_maker,
+            random_translation=args.random_translation,
+            random_rotation=args.random_rotation,
+        )
+
+        assert test_loader.dims == train_loader.dims
 
     model = models_dict[args.model](train_loader.dims, affinity=False).to(device)
 
-    optimizer = optim.SGD(model.parameters(), lr=args.base_lr)
+    optimizer = optim.SGD(
+        model.parameters(),
+        lr=args.base_lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+    )
+
     criterion = nn.NLLLoss()
 
     trainer = create_supervised_trainer(model, optimizer, criterion, device)
 
-    validation_metrics = {
+    train_metrics = {
         "loss": metrics.Loss(criterion),
+    }
+
+    test_metrics = {
         "classification": metrics.ClassificationReport(),
     }
 
     train_evaluator = create_supervised_evaluator(
-        model, metrics=validation_metrics, device=device
+        model, metrics=train_metrics, device=device
     )
+
+    if args.testfile is not None:
+        test_evaluator = create_supervised_evaluator(
+            model, metrics=test_metrics, device=device
+        )
 
     @trainer.on(Events.ITERATION_COMPLETED(every=10))
     def log_training_loss(engine):
@@ -151,10 +222,19 @@ def training(args):
         print(
             f"Training Results - Epoch[{trainer.state.epoch}] Avg loss: {metrics['loss']:.2f}"
         )
-        print(metrics["classification"])
 
-    trainer.run(train_loader, max_epochs=5)
+    if args.testfile is not None:
+
+        @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
+        def log_test_results(trainer):
+            test_evaluator.run(test_loader)
+            metrics = test_evaluator.state.metrics
+            print(f"Test Results - Epoch[{trainer.state.epoch}]")
+            print(metrics["classification"])
+
+    trainer.run(train_loader, max_epochs=args.iterations)
 
 
 if __name__ == "__main__":
-    pass
+    args = options()
+    training(args)

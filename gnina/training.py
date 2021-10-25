@@ -4,8 +4,12 @@ from typing import List, Optional, Tuple
 import molgrid
 import numpy as np
 import torch
+from ignite import metrics
+from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
+from torch import nn, optim
 
-# from gnina.models import models_dict
+from gnina.dataloaders import GriddedExamplesLoader
+from gnina.models import models_dict
 
 
 def options(args: Optional[List[str]] = None):
@@ -57,6 +61,9 @@ def options(args: Optional[List[str]] = None):
     # TODO: ligand type file and receptor type file (default: 28 types)
 
     # Learning
+    parser.add_argument(
+        "--base_lr", type=float, default=0.01, help="Base (initial) learning rate"
+    )
 
     # Misc
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
@@ -68,7 +75,7 @@ def options(args: Optional[List[str]] = None):
 
 def _setup_example_provider_and_grid_maker(
     args,
-) -> Tuple[molgrid.ExampleProvider, molgrid.GridMaker, Tuple[int]]:
+) -> Tuple[molgrid.ExampleProvider, molgrid.GridMaker]:
     """
     Setup :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker` based on command
     line arguments.
@@ -80,8 +87,8 @@ def _setup_example_provider_and_grid_maker(
 
     Returns
     -------
-    Tuple[molgrid.ExampleProvider, molgrid.GridMaker, Tuple[int]]
-        Initialized :code:`molgrid.ExampleProvider`, :code:`molgrid.GridMaker` and grid
+    Tuple[molgrid.ExampleProvider, molgrid.GridMaker
+        Initialized :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker`
         dimensions
     """
     example_provider = molgrid.ExampleProvider(
@@ -90,9 +97,8 @@ def _setup_example_provider_and_grid_maker(
     example_provider.populate(args.trainfile)
 
     grid_maker = molgrid.GridMaker()
-    dims = grid_maker.grid_dimensions(example_provider.num_types())
 
-    return example_provider, grid_maker, dims
+    return example_provider, grid_maker
 
 
 def training(args):
@@ -103,11 +109,51 @@ def training(args):
         np.random.seed(args.seed)
 
     # Set device
-    # device = torch.device(args.gpu)
+    device = torch.device(args.gpu)
 
-    example_provider, grid_maker, dims = _setup_example_provider_and_grid_maker(args)
+    example_provider, grid_maker = _setup_example_provider_and_grid_maker(args)
 
-    # model = models_dict[args.model](dims)
+    train_loader = GriddedExamplesLoader(
+        batch_size=1,
+        example_provider=example_provider,
+        grid_maker=grid_maker,
+        random_translation=0.0,
+        random_rotation=False,
+    )
+
+    model = models_dict[args.model](train_loader.dims, affinity=False).to(device)
+
+    optimizer = optim.SGD(model.parameters(), lr=args.base_lr)
+    criterion = nn.NLLLoss()
+
+    trainer = create_supervised_trainer(model, optimizer, criterion, device)
+
+    validation_metrics = {
+        "loss": metrics.Loss(criterion),
+        "classification": metrics.ClassificationReport(),
+    }
+
+    train_evaluator = create_supervised_evaluator(
+        model, metrics=validation_metrics, device=device
+    )
+
+    @trainer.on(Events.ITERATION_COMPLETED(every=10))
+    def log_training_loss(engine):
+        print(
+            f"Epoch[{engine.state.epoch}], Iter[{engine.state.iteration}] Loss: {engine.state.output:.2f}"
+        )
+
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def log_training_results(trainer):
+        train_evaluator.run(train_loader)
+        metrics = train_evaluator.state.metrics
+        # print(f"Training Results - Epoch[{trainer.state.epoch}] Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['loss']:.2f}")
+        print(
+            f"Training Results - Epoch[{trainer.state.epoch}] Avg loss: {metrics['loss']:.2f}"
+        )
+        print(metrics["classification"])
+
+    trainer.run(train_loader, max_epochs=5)
 
 
 if __name__ == "__main__":

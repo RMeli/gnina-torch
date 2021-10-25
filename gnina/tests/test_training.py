@@ -54,15 +54,14 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot):
 
     assert not args.shuffle
 
-    e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
+    e, gmaker = training._setup_example_provider_and_grid_maker(args)
 
     assert e.num_labels() == 3  # Three labels in small.types
-    assert e.size() == 2  # Two examples in small.types
+    assert e.size() == 3  # Three examples in small.types
     assert e.num_types() == 28
     assert gmaker.get_dimension() == pytest.approx(23.5)
     assert gmaker.get_resolution() == pytest.approx(0.5)
     assert gmaker.grid_dimensions(28) == (28, 48, 48, 48)
-    assert dims == (28, 48, 48, 48)
 
 
 def test_example_provider(trainfile, dataroot):
@@ -72,7 +71,7 @@ def test_example_provider(trainfile, dataroot):
 
     assert not args.shuffle
 
-    e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
+    e, gmaker = training._setup_example_provider_and_grid_maker(args)
 
     batch_size = 2
 
@@ -103,7 +102,8 @@ def test_grid_maker(trainfile, dataroot):
 
     assert not args.shuffle
 
-    e, gmaker, dims = training._setup_example_provider_and_grid_maker(args)
+    e, gmaker = training._setup_example_provider_and_grid_maker(args)
+    dims = gmaker.grid_dimensions(e.num_types())
 
     batch_size = 2
 
@@ -118,6 +118,9 @@ def test_grid_maker(trainfile, dataroot):
     assert any(grid[grid > 0.0])
 
 
-def test_training(trainfile):
-    args = training.options([trainfile])
+def test_training(trainfile, dataroot):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
+
     training.training(args)

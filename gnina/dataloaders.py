@@ -38,7 +38,7 @@ class GriddedExamplesLoader:
         self.batch_idx = 0
 
     def __len__(self):
-        return self.num_examples
+        return self.num_batches
 
     # TODO: Avoid padding with next epoch?
     def __next__(self):

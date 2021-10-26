@@ -9,6 +9,18 @@ dependencies:
   - pip
   - ipython
 
+  - pytorch=1.9
+  - ignite
+  - torchvision
+  - cudatoolkit=11.1
+
+  - scikit-learn>=1.0
+
+  - tqdm
+
+  - pip:
+    - molgrid
+
   - pytest
   - pytest-cov
   - codecov
@@ -16,11 +28,3 @@ dependencies:
   - mypy
   - flake8
   - isort
-
-  - pytorch=1.9
-  - ignite
-  - torchvision
-  - cudatoolkit=11.1
-
-  - pip:
-    - molgrid

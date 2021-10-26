@@ -56,7 +56,7 @@ def test_GriddedExamplesLoader_batch_size(trainfile, dataroot):
         batch_size=2, example_provider=e, grid_maker=gmaker, device=device
     )
 
-    assert len(dataset) == 3
+    assert len(dataset) == 2  # Number of batches
     assert dataset.num_labels == 3
     assert dataset.num_batches == 2
 

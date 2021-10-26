@@ -6,6 +6,8 @@ import molgrid
 import numpy as np
 import torch
 from ignite import metrics
+from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.metrics import ROC_AUC
 from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
 from ignite.handlers import Checkpoint
 from torch import nn, optim
@@ -143,6 +145,21 @@ def _setup_example_provider_and_grid_maker(
         return train_example_provider, grid_maker
 
 
+def _activated_output_transform(output):
+    """
+    Transform :code:`log_softmax` into probability estimates (i.e. softmax activation).
+
+    https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
+    """
+    y_pred, y = output
+
+    # Transform log_softmax output into softmax
+    y_pred = torch.exp(y_pred)
+
+    # Return predicted probability only for the positive class
+    return y_pred[:, -1], y
+
+
 def training(args):
     # Set random seed for reproducibility
     if args.seed is not None:
@@ -196,9 +213,9 @@ def training(args):
 
     trainer = create_supervised_trainer(model, optimizer, criterion, device)
 
-    train_metrics = {
-        "loss": metrics.Loss(criterion),
-    }
+    # train_metrics = {
+    #    "loss": metrics.Loss(criterion),
+    # }
 
     test_metrics = {
         # Balanced accuracy is the average recall over all classes
@@ -209,32 +226,28 @@ def training(args):
         # performing multiclass classification with 2 classes (Linear(out_features=2))
         "accuracy": metrics.Accuracy(),
         "classification": metrics.ClassificationReport(),
+        "roc_auc": ROC_AUC(output_transform=_activated_output_transform),
     }
 
-    train_evaluator = create_supervised_evaluator(
-        model, metrics=train_metrics, device=device
-    )
+    # TODO: Track metrics during training instead
+    # train_evaluator = create_supervised_evaluator(
+    #    model, metrics=train_metrics, device=device
+    # )
 
     if args.testfile is not None:
         test_evaluator = create_supervised_evaluator(
             model, metrics=test_metrics, device=device
         )
 
-    @trainer.on(Events.ITERATION_COMPLETED(every=10))
-    def log_training_loss(engine):
-        print(
-            f"Epoch[{engine.state.epoch}]:Iter[{engine.state.iteration}] Loss: {engine.state.output:.5f}"
-        )
-
     # FIXME: This requires a second pass on the training set
     # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def log_training_results(trainer):
-        train_evaluator.run(train_loader)
-        metrics = train_evaluator.state.metrics
-        # print(f"Training Results - Epoch[{trainer.state.epoch}] Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['loss']:.2f}")
-        print(f">>> Training Results - Epoch[{trainer.state.epoch}]")
-        print(f"    Average Loss: {metrics['loss']:.5f}")
+    # @trainer.on(Events.EPOCH_COMPLETED)
+    # def log_training_results(trainer):
+    #    train_evaluator.run(train_loader)
+    #    metrics = train_evaluator.state.metrics
+    #    # print(f"Training Results - Epoch[{trainer.state.epoch}] Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['loss']:.2f}")
+    #    print(f">>> Training Results - Epoch[{trainer.state.epoch}]")
+    #    print(f"    Average Loss: {metrics['loss']:.5f}")
 
     if args.testfile is not None:
 
@@ -245,6 +258,7 @@ def training(args):
             print(f">>> Test Results - Epoch[{trainer.state.epoch}]")
             print(f"Accuracy: {metrics['accuracy']:.2f}")
             print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
+            print(f"ROC AUC: {metrics['roc_auc']:.2f}")
             # print(metrics["classification"])
 
     # TODO: Save input parameters as well
@@ -257,6 +271,8 @@ def training(args):
     )
     trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint)
 
+    pbar = ProgressBar()
+    pbar.attach(trainer)
     trainer.run(train_loader, max_epochs=args.iterations)
 
 

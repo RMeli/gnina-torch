@@ -84,7 +84,7 @@ def options(args: Optional[List[str]] = None):
         dest="random_rotation",
     )
     parser.add_argument(
-        "--random_translation", type=int, default=6.0, help="Random translation"
+        "--random_translation", type=float, default=6.0, help="Random translation"
     )
     parser.add_argument(
         "-i",
@@ -222,11 +222,7 @@ def training(args):
 
     trainer = create_supervised_trainer(model, optimizer, criterion, device)
 
-    # train_metrics = {
-    #    "loss": metrics.Loss(criterion),
-    # }
-
-    test_metrics = {
+    allmetrics = {
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
         "balanced_accuracy": metrics.Recall(average=True),
@@ -238,33 +234,26 @@ def training(args):
         "roc_auc": ROC_AUC(output_transform=_activated_output_transform),
     }
 
-    # TODO: Track metrics during training instead
-    # train_evaluator = create_supervised_evaluator(
-    #    model, metrics=train_metrics, device=device
-    # )
-
-    if args.testfile is not None:
-        test_evaluator = create_supervised_evaluator(
-            model, metrics=test_metrics, device=device
-        )
+    evaluator = create_supervised_evaluator(model, metrics=allmetrics, device=device)
 
     # FIXME: This requires a second pass on the training set
     # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1
-    # @trainer.on(Events.EPOCH_COMPLETED)
-    # def log_training_results(trainer):
-    #    train_evaluator.run(train_loader)
-    #    metrics = train_evaluator.state.metrics
-    #    # print(f"Training Results - Epoch[{trainer.state.epoch}] Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['loss']:.2f}")
-    #    print(f">>> Training Results - Epoch[{trainer.state.epoch}]")
-    #    print(f"    Average Loss: {metrics['loss']:.5f}")
+    @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
+    def log_training_results(trainer):
+        evaluator.run(train_loader)
+        metrics = evaluator.state.metrics
+        print(f">>> Train Results - Epoch[{trainer.state.epoch}] <<<")
+        print(f"Accuracy: {metrics['accuracy']:.2f}")
+        print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
+        print(f"ROC AUC: {metrics['roc_auc']:.2f}")
 
     if args.testfile is not None:
 
         @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
         def log_test_results(trainer):
-            test_evaluator.run(test_loader)
-            metrics = test_evaluator.state.metrics
-            print(f">>> Test Results - Epoch[{trainer.state.epoch}]")
+            evaluator.run(test_loader)
+            metrics = evaluator.state.metrics
+            print(f">>> Test Results - Epoch[{trainer.state.epoch}] <<<")
             print(f"Accuracy: {metrics['accuracy']:.2f}")
             print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
             print(f"ROC AUC: {metrics['roc_auc']:.2f}")

@@ -1,4 +1,5 @@
 import argparse
+import os
 from typing import List, Optional, Tuple, Union
 
 import molgrid
@@ -6,6 +7,7 @@ import numpy as np
 import torch
 from ignite import metrics
 from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
+from ignite.handlers import Checkpoint
 from torch import nn, optim
 
 from gnina.dataloaders import GriddedExamplesLoader
@@ -53,6 +55,9 @@ def options(args: Optional[List[str]] = None):
         type=int,
         default=None,
         help="Affinity value position in training file",
+    )
+    parser.add_argument(
+        "-o", "--out_prefix", type=str, default=os.getcwd(), help="Output prefix"
     )
 
     # Scoring function
@@ -196,6 +201,13 @@ def training(args):
     }
 
     test_metrics = {
+        # Balanced accuracy is the average recall over all classes
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
+        "balanced_accuracy": metrics.Recall(average=True),
+        # Accuracy can be used directly without binarising the data since we are not
+        # performing binary classification (Linear(out_features=1)) but we are
+        # performing multiclass classification with 2 classes (Linear(out_features=2))
+        "accuracy": metrics.Accuracy(),
         "classification": metrics.ClassificationReport(),
     }
 
@@ -211,17 +223,18 @@ def training(args):
     @trainer.on(Events.ITERATION_COMPLETED(every=10))
     def log_training_loss(engine):
         print(
-            f"Epoch[{engine.state.epoch}], Iter[{engine.state.iteration}] Loss: {engine.state.output:.2f}"
+            f"Epoch[{engine.state.epoch}]:Iter[{engine.state.iteration}] Loss: {engine.state.output:.5f}"
         )
 
+    # FIXME: This requires a second pass on the training set
+    # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1
     @trainer.on(Events.EPOCH_COMPLETED)
     def log_training_results(trainer):
         train_evaluator.run(train_loader)
         metrics = train_evaluator.state.metrics
         # print(f"Training Results - Epoch[{trainer.state.epoch}] Avg accuracy: {metrics['accuracy']:.2f} Avg loss: {metrics['loss']:.2f}")
-        print(
-            f"Training Results - Epoch[{trainer.state.epoch}] Avg loss: {metrics['loss']:.2f}"
-        )
+        print(f">>> Training Results - Epoch[{trainer.state.epoch}]")
+        print(f"    Average Loss: {metrics['loss']:.5f}")
 
     if args.testfile is not None:
 
@@ -229,8 +242,20 @@ def training(args):
         def log_test_results(trainer):
             test_evaluator.run(test_loader)
             metrics = test_evaluator.state.metrics
-            print(f"Test Results - Epoch[{trainer.state.epoch}]")
-            print(metrics["classification"])
+            print(f">>> Test Results - Epoch[{trainer.state.epoch}]")
+            print(f"Accuracy: {metrics['accuracy']:.2f}")
+            print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
+            # print(metrics["classification"])
+
+    # TODO: Save input parameters as well
+    to_save = {"model": model, "optimizer": optimizer}
+    checkpoint = Checkpoint(
+        to_save,
+        args.out_prefix,
+        n_saved=5,
+        global_step_transform=lambda *_: trainer.state.epoch,
+    )
+    trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint)
 
     trainer.run(train_loader, max_epochs=args.iterations)
 

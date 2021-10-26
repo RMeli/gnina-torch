@@ -120,7 +120,7 @@ def test_grid_maker(trainfile, dataroot):
     assert any(grid[grid > 0.0])
 
 
-def test_training(trainfile, dataroot):
+def test_training(trainfile, dataroot, tmpdir):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -135,13 +135,15 @@ def test_training(trainfile, dataroot):
             "2",
             "--iterations",
             "5",
+            "-o",
+            str(tmpdir),
         ]
     )
 
     training.training(args)
 
 
-def test_training_with_test(trainfile, dataroot):
+def test_training_with_test(trainfile, dataroot, tmpdir):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -158,6 +160,8 @@ def test_training_with_test(trainfile, dataroot):
             "2",
             "--iterations",
             "5",
+            "-o",
+            str(tmpdir),
         ]
     )
 

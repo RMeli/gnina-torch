@@ -59,7 +59,7 @@ def options(args: Optional[List[str]] = None):
         help="Affinity value position in training file",
     )
     parser.add_argument(
-        "-o", "--out_prefix", type=str, default=os.getcwd(), help="Output prefix"
+        "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
 
     # Scoring function
@@ -107,6 +107,7 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "--num_checkpoints", type=int, default=1, help="Number of checkpoints to keep"
     )
+    parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
 
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
@@ -256,14 +257,14 @@ def training(args):
             print(f">>> Test Results - Epoch[{trainer.state.epoch}] <<<")
             print(f"Accuracy: {metrics['accuracy']:.2f}")
             print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
-            print(f"ROC AUC: {metrics['roc_auc']:.2f}")
+            print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True)
             # print(metrics["classification"])
 
     # TODO: Save input parameters as well
     to_save = {"model": model, "optimizer": optimizer}
     checkpoint = Checkpoint(
         to_save,
-        args.out_prefix,
+        args.out_dir,
         n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,
     )
@@ -271,8 +272,10 @@ def training(args):
         Events.EPOCH_COMPLETED(every=args.checkpoint_every), checkpoint
     )
 
-    pbar = ProgressBar()
-    pbar.attach(trainer)
+    if args.progress_bar:
+        pbar = ProgressBar()
+        pbar.attach(trainer)
+
     trainer.run(train_loader, max_epochs=args.iterations)
 
 

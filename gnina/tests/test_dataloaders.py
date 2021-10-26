@@ -13,12 +13,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 @pytest.fixture
 def trainfile() -> str:
+    """
+    Path to small training file.
+    """
     gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
     return os.path.join(gnina_path, "data", "test.types")
 
 
 @pytest.fixture
 def dataroot() -> str:
+    """
+    Path to test directory.
+    """
     gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
     return os.path.join(gnina_path, "data", "test")
 

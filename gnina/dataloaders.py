@@ -49,9 +49,7 @@ class GriddedExamplesLoader:
         """
         # Raising StopIteration is needed by PyTorch-Ignite's Engine
         #   https://pytorch.org/ignite/concepts.html#engine
-        # If this is not present, the epoch_length is determined by len(self) and
-        # therefore in this case it is the number of examples (and not the number of
-        # batches as it should be)
+        # If this is not present, the epoch_length is determined by len(self)
         if self.batch_idx == self.num_batches:
             self.batch_idx = 0
             raise StopIteration

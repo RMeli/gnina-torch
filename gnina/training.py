@@ -98,6 +98,15 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "-t", "--test_every", type=int, default=1000, help="Test interval"
     )
+    parser.add_argument(
+        "--checkpoint_every",
+        type=int,
+        default=100,
+        help="Number of epochs per checkpoint",
+    )
+    parser.add_argument(
+        "--num_checkpoints", type=int, default=1, help="Number of checkpoints to keep"
+    )
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
 
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
@@ -266,10 +275,12 @@ def training(args):
     checkpoint = Checkpoint(
         to_save,
         args.out_prefix,
-        n_saved=5,
+        n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,
     )
-    trainer.add_event_handler(Events.EPOCH_COMPLETED, checkpoint)
+    trainer.add_event_handler(
+        Events.EPOCH_COMPLETED(every=args.checkpoint_every), checkpoint
+    )
 
     pbar = ProgressBar()
     pbar.attach(trainer)

@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional
 
 import molgrid
 import numpy as np
@@ -93,6 +93,13 @@ def options(args: Optional[List[str]] = None):
         default=250000,
         help="Number of iterations (epochs)",
     )
+    parser.add_argument(
+        "--iteration_scheme",
+        type=str,
+        default="small",
+        help="molgrid iteration sheme",
+        choices=["small", "large"],
+    )
 
     # Misc
     parser.add_argument(
@@ -115,44 +122,57 @@ def options(args: Optional[List[str]] = None):
     return parser.parse_args(args)
 
 
-def _setup_example_provider_and_grid_maker(
-    args,
-) -> Union[
-    Tuple[molgrid.ExampleProvider, molgrid.GridMaker],
-    Tuple[molgrid.ExampleProvider, molgrid.ExampleProvider, molgrid.GridMaker],
-]:
+_iteration_schemes = {
+    "small": molgrid.IterationScheme.SmallEpoch,
+    "large": molgrid.IterationScheme.LargeEpoch,
+}
+
+
+def _setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
+    """
+    Setup :code:`molgrid.ExampleProvider` based on command line arguments.
+
+    Parameters
+    ----------
+    args:
+        Command line arguments
+
+    Returns
+    -------
+    molgrid.ExampleProvider
+        Initialized :code:`molgrid.ExampleProvider`
+    """
+    example_provider = molgrid.ExampleProvider(
+        data_root=args.data_root,
+        balanced=args.balanced,
+        shuffle=args.shuffle,
+        default_batch_size=args.batch_size,
+        iteration_scheme=_iteration_schemes[args.iteration_scheme],
+        cache_structs=True,
+    )
+    example_provider.populate(examples_file)
+
+    return example_provider
+
+
+def _setup_grid_maker(args) -> molgrid.GridMaker:
     """
     Setup :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker` based on command
     line arguments.
 
     Parameters
     ----------
-    args: Optional[List[str]]
-        List of command line arguments
+    args:
+        Command line arguments
 
     Returns
     -------
-    Tuple[molgrid.ExampleProvider, molgrid.GridMaker
-        Initialized :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker`
-        dimensions
+    molgrid.GridMaker
+        Initialized :code:`molgrid.GridMaker`
     """
-    train_example_provider = molgrid.ExampleProvider(
-        data_root=args.data_root, balanced=args.balanced, shuffle=args.shuffle
-    )
-    train_example_provider.populate(args.trainfile)
-
     grid_maker = molgrid.GridMaker()
 
-    if args.testfile is not None:
-        # Test example do not need to be balanced or shuffled
-        test_example_provider = molgrid.ExampleProvider(
-            data_root=args.data_root, balanced=False, shuffle=False
-        )
-        test_example_provider.populate(args.testfile)
-
-        return train_example_provider, test_example_provider, grid_maker
-    else:
-        return train_example_provider, grid_maker
+    return grid_maker
 
 
 def _activated_output_transform(output):
@@ -180,19 +200,15 @@ def training(args):
     # Set device
     device = torch.device(args.gpu)
 
+    # Create example providers
+    train_example_provider = _setup_example_provider(args.trainfile, args)
     if args.testfile is not None:
-        (
-            train_example_provider,
-            test_example_provider,
-            grid_maker,
-        ) = _setup_example_provider_and_grid_maker(args)
-    else:
-        train_example_provider, grid_maker = _setup_example_provider_and_grid_maker(
-            args
-        )
+        test_example_provider = _setup_example_provider(args.testfile, args)
+
+    # Create grid maker
+    grid_maker = _setup_grid_maker(args)
 
     train_loader = GriddedExamplesLoader(
-        batch_size=args.batch_size,
         example_provider=train_example_provider,
         grid_maker=grid_maker,
         random_translation=args.random_translation,
@@ -201,7 +217,6 @@ def training(args):
 
     if args.testfile is not None:
         test_loader = GriddedExamplesLoader(
-            batch_size=args.batch_size,
             example_provider=test_example_provider,
             grid_maker=grid_maker,
             random_translation=args.random_translation,

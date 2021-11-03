@@ -1,26 +1,41 @@
-import math
-
+import molgrid
 import torch
 
 
 class GriddedExamplesLoader:
+    """
+    Load example and compute atomic density on a grid.
+
+    Parameters
+    ----------
+    example_provider : :class:`molgrid.ExampleProvider`
+        :package:`molgrid` example provider
+    grid_maker : :class:`molgrid.GridMaker`
+        :package:`molgrid` grid maker
+    random_translation : float
+        Random translation applied to each example on each cartesian axis
+    random_rotation : bool
+        Uniform random rotation applied to each example
+    device : torch.device
+        Device
+    """
+
     def __init__(
         self,
-        batch_size,
         example_provider,
         grid_maker,
         random_translation: float = 0.0,
         random_rotation: bool = False,
         device: torch.device = torch.device("cpu"),
     ):
-        self.batch_size = batch_size
+        # Check that example provider is populated
+        assert example_provider.size() > 0
+
         self.example_provider = example_provider
         self.grid_maker = grid_maker
         self.random_translation = random_translation
         self.random_rotation = random_rotation
         self.device = device
-
-        # TODO: Check that example provider is populated
 
         self.num_examples = self.example_provider.size()
         self.num_labels = self.example_provider.num_labels()
@@ -28,38 +43,39 @@ class GriddedExamplesLoader:
 
         self.dims = grid_maker.grid_dimensions(self.num_types)
 
-        if self.batch_size > self.num_examples:
-            raise ValueError(
-                f"Batch size {self.batch_size} is larger "
-                + f"than number of examples {self.num_examples}"
-            )
-
-        self.num_batches = math.ceil(self.num_examples / self.batch_size)
-        self.batch_idx = 0
-
     def __len__(self):
-        return self.num_batches
+        settings = self.example_provider.settings()
 
-    # TODO: Avoid padding with next epoch?
+        if settings.iteration_scheme == molgrid.IterationScheme.SmallEpoch:
+            return self.example_provider.small_epoch_size()
+        elif settings.iteration_scheme == molgrid.IterationScheme.LargeEpoch:
+            return self.example_provider.large_epoch_size()
+        else:
+            raise ValueError("Unknown iteration scheme {settings.iteration_scheme}.")
+
+    # TODO: Avoid padding with next epoch? (Does this happen with the currenti iteration scheme?)
     def __next__(self):
         """
+        Get next batch of gridded examples and corresponding labels.
+
         Notes
         -----
-        By default :code:molgrid: pads the last batch with examples from the next epoch.
+        The batch size is defined in the :code:`example_provider` as
+        :code:`default_batch_size`. The number of batches actually depend on the
+        :code:`molgrid.IterationScheme` used, also defined in the
+        :code:`example_provider`.
+
+        If :code:`molgrid.IterationScheme.SmallEpoch` is used, examples are seen at most
+        once. If :code:`molgrid.IterationScheme.LargeEpoch` is used, examples are seen
+        at least once.
         """
-        # Raising StopIteration is needed by PyTorch-Ignite's Engine
-        #   https://pytorch.org/ignite/concepts.html#engine
-        # If this is not present, the epoch_length is determined by len(self)
-        if self.batch_idx == self.num_batches:
-            self.batch_idx = 0
-            raise StopIteration
-        else:
-            self.batch_idx += 1
+        # Use pre-defined molgrid.IterationScheme
+        batch = next(self.example_provider)
 
-        batch = self.example_provider.next_batch(self.batch_size)
+        batch_size = len(batch)
 
-        grids = torch.zeros((self.batch_size, *self.dims), device=self.device)
-        labels = torch.zeros((self.batch_size,), device=self.device)
+        grids = torch.zeros((batch_size, *self.dims), device=self.device)
+        labels = torch.zeros((batch_size,), device=self.device)
 
         # Compute grids from examples
         self.grid_maker.forward(

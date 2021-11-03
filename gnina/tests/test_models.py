@@ -3,9 +3,6 @@ import torch
 
 from gnina.models import Default2017, Default2018, Dense, DenseBlock
 
-# TODO: Allow to deactivate cuda when running tests
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 @pytest.fixture
 def batch_size():
@@ -18,11 +15,11 @@ def dims():
 
 
 @pytest.fixture
-def x(batch_size, dims):
+def x(batch_size, dims, device):
     return torch.normal(mean=0, std=1, size=(batch_size, *dims), device=device)
 
 
-def test_default2017_forward(batch_size, dims, x):
+def test_default2017_forward(batch_size, dims, x, device):
     model = Default2017(input_dims=dims).to(device)
     pose_raw, affinity = model(x)
 
@@ -30,7 +27,7 @@ def test_default2017_forward(batch_size, dims, x):
     assert affinity.shape == (batch_size, 1)
 
 
-def test_default2018_forward(batch_size, dims, x):
+def test_default2018_forward(batch_size, dims, x, device):
     model = Default2018(input_dims=dims).to(device)
     pose_raw, affinity = model(x)
 
@@ -40,7 +37,9 @@ def test_default2018_forward(batch_size, dims, x):
 
 @pytest.mark.parametrize("num_block_convs", [1, 4])
 @pytest.mark.parametrize("num_block_features", [2, 16])
-def test_denseblock_forward_small(batch_size, x, num_block_features, num_block_convs):
+def test_denseblock_forward_small(
+    batch_size, x, num_block_features, num_block_convs, device
+):
     in_features = x.shape[1]
 
     block = DenseBlock(
@@ -58,7 +57,7 @@ def test_denseblock_forward_small(batch_size, x, num_block_features, num_block_c
 
 @pytest.mark.parametrize("num_block_convs", [1, 4])
 @pytest.mark.parametrize("num_block_features", [8, 16])
-def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs):
+def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs, device):
     in_features = x.shape[1]
 
     block = DenseBlock(
@@ -76,7 +75,9 @@ def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs):
 
 @pytest.mark.parametrize("num_block_convs", [1, 4])
 @pytest.mark.parametrize("num_block_features", [8, 16])
-def test_dense_forward(batch_size, x, dims, num_block_features, num_block_convs):
+def test_dense_forward(
+    batch_size, x, dims, num_block_features, num_block_convs, device
+):
     model = Dense(
         input_dims=dims,
         num_blocks=3,

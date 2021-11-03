@@ -149,6 +149,8 @@ def test_training(trainfile, dataroot, tmpdir, device):
             str(tmpdir),
             "-g",
             str(device),
+            "--seed",
+            "42",
         ]
     )
 
@@ -176,6 +178,9 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
             str(tmpdir),
             "-g",
             str(device),
+            "--seed",
+            "42",
+            "--progress_bar",
         ]
     )
 

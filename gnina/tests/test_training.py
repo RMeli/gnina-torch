@@ -6,9 +6,6 @@ import torch
 
 from gnina import training
 
-# TODO: Allow to deactivate cuda when running tests
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 @pytest.fixture
 def trainfile() -> str:
@@ -47,10 +44,12 @@ def test_options(trainfile, model, gpu):
     assert args.seed == seed
 
 
-def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot):
+def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
-    args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
+    args = training.options(
+        [trainfile, "-d", dataroot, "--no_shuffle", "-g", str(device)]
+    )
 
     assert not args.shuffle
 
@@ -64,11 +63,20 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot):
     assert gmaker.grid_dimensions(28) == (28, 48, 48, 48)
 
 
-def test_example_provider(trainfile, dataroot):
+def test_example_provider(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
-        [trainfile, "-d", dataroot, "--no_shuffle", "--affinity_pos", "1"]
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--affinity_pos",
+            "1",
+            "-g",
+            str(device),
+        ]
     )
 
     assert not args.shuffle
@@ -97,10 +105,12 @@ def test_example_provider(trainfile, dataroot):
     assert torch.allclose(whatever, torch.tensor([1.2, 2.2], device=device))
 
 
-def test_grid_maker(trainfile, dataroot):
+def test_grid_maker(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
-    args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
+    args = training.options(
+        [trainfile, "-d", dataroot, "--no_shuffle", "-g", str(device)]
+    )
 
     assert not args.shuffle
 
@@ -120,7 +130,7 @@ def test_grid_maker(trainfile, dataroot):
     assert any(grid[grid > 0.0])
 
 
-def test_training(trainfile, dataroot, tmpdir):
+def test_training(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -137,13 +147,15 @@ def test_training(trainfile, dataroot, tmpdir):
             "5",
             "-o",
             str(tmpdir),
+            "-g",
+            str(device),
         ]
     )
 
     training.training(args)
 
 
-def test_training_with_test(trainfile, dataroot, tmpdir):
+def test_training_with_test(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -162,6 +174,8 @@ def test_training_with_test(trainfile, dataroot, tmpdir):
             "5",
             "-o",
             str(tmpdir),
+            "-g",
+            str(device),
         ]
     )
 

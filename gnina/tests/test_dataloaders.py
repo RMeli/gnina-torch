@@ -7,9 +7,6 @@ import torch
 from gnina import training
 from gnina.dataloaders import GriddedExamplesLoader
 
-# TODO: Allow to deactivate cuda when running tests
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 @pytest.fixture
 def trainfile() -> str:
@@ -29,14 +26,16 @@ def dataroot() -> str:
     return os.path.join(gnina_path, "data", "test")
 
 
-def test_GriddedExamplesLoader(trainfile, dataroot):
+def test_GriddedExamplesLoader(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])
 
     e, gmaker = training._setup_example_provider_and_grid_maker(args)
 
-    dataset = GriddedExamplesLoader(batch_size=1, example_provider=e, grid_maker=gmaker)
+    dataset = GriddedExamplesLoader(
+        batch_size=1, example_provider=e, grid_maker=gmaker, device=device
+    )
 
     assert len(dataset) == 3
     assert dataset.num_labels == 3
@@ -51,7 +50,7 @@ def test_GriddedExamplesLoader(trainfile, dataroot):
         next(dataset)
 
 
-def test_GriddedExamplesLoader_batch_size(trainfile, dataroot):
+def test_GriddedExamplesLoader_batch_size(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options([trainfile, "-d", dataroot, "--no_shuffle"])

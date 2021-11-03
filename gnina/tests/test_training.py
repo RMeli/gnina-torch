@@ -185,3 +185,42 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
     )
 
     training.training(args)
+
+
+def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfile,
+            "--testfile",
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "1",
+            "--test_every",
+            "2",
+            "--iterations",
+            "5",
+            "-o",
+            str(tmpdir),
+            "-g",
+            str(device),
+            "--seed",
+            "42",
+            "--progress_bar",
+            "--dynamic",
+            "--lr_patience",
+            "1",
+        ]
+    )
+
+    training.training(args)
+
+    # Check that the learning rate changes during training
+    # TODO: Store learning rate internally and check the cache instead
+    captured = capsys.readouterr()
+    assert "Learning rate: 0.01" in captured.out  # Original (default) learning rate
+    assert "Learning rate: 0.001" in captured.out  # Updated learning rate

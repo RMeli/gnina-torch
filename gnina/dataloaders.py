@@ -44,6 +44,20 @@ class GriddedExamplesLoader:
         self.dims = grid_maker.grid_dimensions(self.num_types)
 
     def __len__(self):
+        """
+        Return length of the epoch (number of examples).
+
+        Notes
+        -----
+        The number of examples per epoch depends on the :code:`molgrid.IterationScheme`
+        used. Without balancing nor stratification, the number of examples per epoch is
+        the same for :code:`molgrid.IterationScheme.SmalleEpoch` and
+        :code:`molgrid.IterationScheme.SmalleEpoch`. For balanced sampling, which sample
+        the sanem number of positive and negative examples, the number of examples in a
+        small epoch (examples seen at most once) is twice the size of the minority class
+        while for a large epoch (examples seen at least once) it is twice the size of
+        the majority class.
+        """
         settings = self.example_provider.settings()
 
         if settings.iteration_scheme == molgrid.IterationScheme.SmallEpoch:
@@ -53,7 +67,8 @@ class GriddedExamplesLoader:
         else:
             raise ValueError("Unknown iteration scheme {settings.iteration_scheme}.")
 
-    # TODO: Avoid padding with next epoch? (Does this happen with the currenti iteration scheme?)
+    # TODO: Avoid padding with next epoch?
+    # TODO: Does this happen with the currenti iteration scheme?)
     def __next__(self):
         """
         Get next batch of gridded examples and corresponding labels.

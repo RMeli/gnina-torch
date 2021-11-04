@@ -128,6 +128,27 @@ _iteration_schemes = {
 }
 
 
+def _setup_loss(args) -> nn.Module:
+    """
+    Setup :code:`nn.Module` for loss function based on command line arguments.
+
+    Parameters
+    ----------
+    args:
+        Command line arguments
+
+    Returns
+    -------
+    nn.Module
+        Loss function
+    """
+    if args.affinity_pos is None:
+        # Binary classification for pose prediction
+        return nn.NLLLoss()
+    else:
+        return nn.MSELoss()
+
+
 def _setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
     """
     Setup :code:`molgrid.ExampleProvider` based on command line arguments.
@@ -179,6 +200,18 @@ def _activated_output_transform(output):
     """
     Transform :code:`log_softmax` into probability estimates (i.e. softmax activation).
 
+    Parameters
+    ----------
+    output:
+        Output of :code:`nn.Module`
+
+    Returns
+    -------
+    Tuple[torch.Tensor]
+        Probability estimates for the positive class and true label.
+
+    Notes
+    -----
     https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
     """
     y_pred, y = output

@@ -1,3 +1,5 @@
+from typing import Optional
+
 import molgrid
 import torch
 
@@ -12,6 +14,10 @@ class GriddedExamplesLoader:
         :package:`molgrid` example provider
     grid_maker : :class:`molgrid.GridMaker`
         :package:`molgrid` grid maker
+    label_pos: int
+        Ligand pose annotation label position
+    affinity_pos: Optional[int]
+        Affinity annotation position
     random_translation : float
         Random translation applied to each example on each cartesian axis
     random_rotation : bool
@@ -24,6 +30,8 @@ class GriddedExamplesLoader:
         self,
         example_provider,
         grid_maker,
+        label_pos: int = 0,
+        affinity_pos: Optional[int] = None,
         random_translation: float = 0.0,
         random_rotation: bool = False,
         device: torch.device = torch.device("cpu"),
@@ -33,6 +41,8 @@ class GriddedExamplesLoader:
 
         self.example_provider = example_provider
         self.grid_maker = grid_maker
+        self.label_pos = label_pos
+        self.affinity_pos = affinity_pos
         self.random_translation = random_translation
         self.random_rotation = random_rotation
         self.device = device
@@ -91,6 +101,8 @@ class GriddedExamplesLoader:
 
         grids = torch.zeros((batch_size, *self.dims), device=self.device)
         labels = torch.zeros((batch_size,), device=self.device)
+        if self.affinity_pos is not None:
+            affinities = torch.zeros((batch_size,), device=self.device)
 
         # Compute grids from examples
         self.grid_maker.forward(
@@ -100,8 +112,9 @@ class GriddedExamplesLoader:
             random_rotation=self.random_rotation,
         )
 
-        # TODO: Generalise to extract other labels as well
-        batch.extract_label(0, labels)
+        batch.extract_label(self.label_pos, labels)
+        if self.affinity_pos is not None:
+            batch.extract_label(self.affinity_pos, affinities)
 
         # Convert labels to integers
         # libmolgrid only supports float input

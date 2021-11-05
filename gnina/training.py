@@ -58,6 +58,8 @@ def options(args: Optional[List[str]] = None):
         default=None,
         help="Affinity value position in training file",
     )
+    parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
+    parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
@@ -191,7 +193,7 @@ def _setup_grid_maker(args) -> molgrid.GridMaker:
     molgrid.GridMaker
         Initialized :code:`molgrid.GridMaker`
     """
-    grid_maker = molgrid.GridMaker()
+    grid_maker = molgrid.GridMaker(resolution=args.resolution, dimension=args.dimension)
 
     return grid_maker
 

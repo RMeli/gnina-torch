@@ -72,6 +72,29 @@ def test_setup_grid_maker_default(trainfile, dataroot, device):
     assert gmaker.grid_dimensions(28) == (28, 48, 48, 48)
 
 
+def test_setup_grid_maker_dimensio_and_resolution(trainfile, dataroot, device):
+    args = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "-g",
+            str(device),
+            "--dimension",
+            "10.0",
+            "--resolution",
+            "1.0",
+        ]
+    )
+
+    gmaker = training._setup_grid_maker(args)
+
+    assert gmaker.get_dimension() == pytest.approx(10.0)
+    assert gmaker.get_resolution() == pytest.approx(1.0)
+    assert gmaker.grid_dimensions(28) == (28, 11, 11, 11)
+
+
 def test_example_provider(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility

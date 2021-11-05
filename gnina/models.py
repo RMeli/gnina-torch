@@ -123,11 +123,12 @@ class Default2017(nn.Module):
                 )
             )
 
-        # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
         for m in self.modules():
             if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight.data)
+                # TODO: Initialize bias to zero?
+                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -280,7 +281,6 @@ class Default2018(nn.Module):
                 )
             )
 
-        # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
         for m in self.modules():
             if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
@@ -532,7 +532,6 @@ class Dense(nn.Module):
                 )
             )
 
-        # TODO: Check that Caffe's Xavier is xavier_uniform_ (not xavier_normal_)
         # Xavier initialization for convolutional and linear layers
         for m in self.modules():
             if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):

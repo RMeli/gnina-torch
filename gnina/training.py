@@ -72,6 +72,23 @@ def options(args: Optional[List[str]] = None):
         help="Affinity value position in training file",
     )
     parser.add_argument(
+        "--stratify_receptor",
+        action="store_true",
+        help="Sample uniformly across receptors",
+    )
+    parser.add_argument(
+        "--ligmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for ligands",
+    )
+    parser.add_argument(
+        "--recmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for receptors",
+    )
+    parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
 
@@ -138,6 +155,7 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
 
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
+    parser.add_argument("--silent", action="store_true", help="No console output")
 
     return parser.parse_args(args)
 
@@ -164,6 +182,9 @@ def _setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
         shuffle=args.shuffle,
         default_batch_size=args.batch_size,
         iteration_scheme=_iteration_schemes[args.iteration_scheme],
+        ligmolcache=args.ligmolcache,
+        recmolcache=args.recmolcache,
+        stratify_receptor=args.stratify_receptor,
         cache_structs=True,
     )
     example_provider.populate(examples_file)
@@ -528,7 +549,7 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
     return m
 
 
-def _log_print(title: str, epoch: int, metrics, affinity: bool):
+def _log_print(title: str, epoch: int, metrics, affinity: bool, stream=sys.stdout):
     """
     Print metrics to the console.
 
@@ -542,18 +563,20 @@ def _log_print(title: str, epoch: int, metrics, affinity: bool):
         Dictionary of metrics
     affinity: bool
         Flag for binding affinity predictions
+    args: argparse.Namespace
+        Command line arg
     """
-    print(f">>> {title} - Epoch[{epoch}] <<<")
+    print(f">>> {title} - Epoch[{epoch}] <<<", file=stream)
 
     # Pose classification metriccs
-    print(f"Accuracy: {metrics['accuracy']:.2f}")
-    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
-    print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True)
+    print(f"Accuracy: {metrics['accuracy']:.2f}", file=stream)
+    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}", file=stream)
+    print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True, file=stream)
 
     # Binding affinity prediction metrics
     if affinity:
-        print(f"MAE: {metrics['MAE']:.2f}")
-        print(f"MSE: {metrics['MSE']:.2f}")
+        print(f"MAE: {metrics['MAE']:.2f}", file=stream)
+        print(f"MSE: {metrics['MSE']:.2f}", file=stream)
 
 
 def _print_args(args, header=None, stream=sys.stdout):
@@ -561,6 +584,7 @@ def _print_args(args, header=None, stream=sys.stdout):
         print(header, file=stream)
     for name, value in vars(args).items():
         print(f"{name} = {value!r}", file=stream)
+    print("", file=stream, flush=True)
 
 
 def training(args):
@@ -572,7 +596,17 @@ def training(args):
     args:
         Command line arguments
     """
-    _print_args(args, header="--- GNINA TRAINING ---")
+
+    # Define output streams for logging
+    outfile = open(os.path.join(args.out_dir, "training.log"), "w")
+    if not args.silent:
+        outstreams = [sys.stdoutm, outfile]
+    else:
+        outstreams = [outfile]
+
+    # Print command line arguments
+    for outstream in outstreams:
+        _print_args(args, "--- GNINA TRAINING ---", stream=outstream)
 
     # Set random seed for reproducibility
     if args.seed is not None:
@@ -635,24 +669,30 @@ def training(args):
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
         evaluator.run(train_loader)
-        _log_print(
-            "Train Results",
-            trainer.state.epoch,
-            evaluator.state.metrics,
-            affinity=affinity,
-        )
+
+        for outstream in outstreams:
+            _log_print(
+                "Train Results",
+                trainer.state.epoch,
+                evaluator.state.metrics,
+                affinity=affinity,
+                stream=outstream,
+            )
 
     if args.testfile is not None:
 
         @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
         def log_test_results(trainer):
             evaluator.run(test_loader)
-            _log_print(
-                "Test Results",
-                trainer.state.epoch,
-                evaluator.state.metrics,
-                affinity=affinity,
-            )
+
+            for outstream in outstreams:
+                _log_print(
+                    "Test Results",
+                    trainer.state.epoch,
+                    evaluator.state.metrics,
+                    affinity=affinity,
+                    stream=outstream,
+                )
 
     # TODO: Save input parameters as well
     to_save = {"model": model, "optimizer": optimizer}
@@ -671,6 +711,9 @@ def training(args):
         pbar.attach(trainer)
 
     trainer.run(train_loader, max_epochs=args.iterations)
+
+    # Close log file
+    outfile.close()
 
 
 if __name__ == "__main__":

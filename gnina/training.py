@@ -189,33 +189,6 @@ def _setup_grid_maker(args) -> molgrid.GridMaker:
     return grid_maker
 
 
-def _activated_output_transform(output):
-    """
-    Transform :code:`log_softmax` into probability estimates (i.e. softmax activation).
-
-    Parameters
-    ----------
-    output:
-        Output of :code:`nn.Module`
-
-    Returns
-    -------
-    Tuple[torch.Tensor]
-        Probability estimates for the positive class and true label.
-
-    Notes
-    -----
-    https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
-    """
-    y_pred, y = output
-
-    # Transform log_softmax output into softmax
-    y_pred = torch.exp(y_pred)
-
-    # Return predicted probability only for the positive class
-    return y_pred[:, -1], y
-
-
 def _train_step_pose_and_affinity(
     trainer: Engine, batch, model, optimizer, pose_loss, affinity_loss
 ):
@@ -367,16 +340,6 @@ def _setup_evaluator(model, metrics, device, affinity: bool = False) -> Engine:
         evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
 
     return evaluator
-
-
-# def _output_transform_pose_and_affinity(x, y, y_pred):
-#    """
-#    Output transformation for affinity prediction.
-#    """
-#    labels, affinities = y
-#    pose_log, affinities_pred = y_pred
-
-#    return pose_log, affinities_pred, labels, affinities
 
 
 def _output_transform_identity(args: Tuple[Any]) -> Tuple[Any]:
@@ -608,8 +571,6 @@ def training(args):
 
     evaluator = _setup_evaluator(model, allmetrics, device, affinity=affinity)
 
-    # FIXME: This requires a second pass on the training set
-    # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
         evaluator.run(train_loader)

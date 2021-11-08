@@ -108,3 +108,7 @@ ENV/
 # editors
 .vscode
 .idea
+
+# data
+examples/Francoeur2020/PDBbind2016/data/
+examples/Ragoza2017/models-master/

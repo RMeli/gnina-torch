@@ -232,3 +232,34 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
     )
 
     training.training(args)
+
+
+def test_training_pose_and_affinity(trainfile, dataroot, tmpdir, device):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "2",
+            "--test_every",
+            "2",
+            "--iterations",
+            "5",
+            "-o",
+            str(tmpdir),
+            "-g",
+            str(device),
+            "--seed",
+            "42",
+            "--label_pos",
+            "0",
+            "--affinity_pos",
+            "1",
+        ]
+    )
+
+    training.training(args)

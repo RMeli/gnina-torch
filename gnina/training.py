@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import molgrid
 import numpy as np
@@ -8,12 +8,23 @@ import torch
 from ignite import metrics
 from ignite.contrib.handlers import ProgressBar
 from ignite.contrib.metrics import ROC_AUC
-from ignite.engine import Events, create_supervised_evaluator, create_supervised_trainer
+from ignite.engine import (
+    Engine,
+    Events,
+    create_supervised_evaluator,
+    create_supervised_trainer,
+)
 from ignite.handlers import Checkpoint
 from torch import nn, optim
 
 from gnina.dataloaders import GriddedExamplesLoader
+from gnina.losses import PseudoHuberLoss
 from gnina.models import models_dict
+
+_iteration_schemes = {
+    "small": molgrid.IterationScheme.SmallEpoch,
+    "large": molgrid.IterationScheme.LargeEpoch,
+}
 
 
 def options(args: Optional[List[str]] = None):
@@ -58,16 +69,21 @@ def options(args: Optional[List[str]] = None):
         default=None,
         help="Affinity value position in training file",
     )
-    parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
-    parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
 
     # Scoring function
     parser.add_argument(
-        "-m", "--model", type=str, default="default2017", help="Model name"
+        "-m",
+        "--model",
+        type=str,
+        default="default2017",
+        help="Model name",
+        choices=models_dict.keys(),
     )
+    parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
+    parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
     # TODO: ligand type file and receptor type file (default: 28 types)
 
     # Learning
@@ -100,7 +116,7 @@ def options(args: Optional[List[str]] = None):
         type=str,
         default="small",
         help="molgrid iteration sheme",
-        choices=["small", "large"],
+        choices=_iteration_schemes.keys(),
     )
 
     # Misc
@@ -124,39 +140,14 @@ def options(args: Optional[List[str]] = None):
     return parser.parse_args(args)
 
 
-_iteration_schemes = {
-    "small": molgrid.IterationScheme.SmallEpoch,
-    "large": molgrid.IterationScheme.LargeEpoch,
-}
-
-
-def _setup_loss(args) -> nn.Module:
-    """
-    Setup :code:`nn.Module` for loss function based on command line arguments.
-
-    Parameters
-    ----------
-    args:
-        Command line arguments
-
-    Returns
-    -------
-    nn.Module
-        Loss function
-    """
-    if args.affinity_pos is None:
-        # Binary classification for pose prediction
-        return nn.NLLLoss()
-    else:
-        return nn.MSELoss()
-
-
 def _setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
     """
     Setup :code:`molgrid.ExampleProvider` based on command line arguments.
 
     Parameters
     ----------
+    examples_file: str
+        File with examples (.types file)
     args:
         Command line arguments
 
@@ -225,7 +216,255 @@ def _activated_output_transform(output):
     return y_pred[:, -1], y
 
 
+def _train_step_pose_and_affinity(
+    trainer: Engine, batch, model, optimizer, pose_loss, affinity_loss
+):
+    """
+    Update for pose and affinity prediction.
+    """
+    model.train()
+    optimizer.zero_grad()
+
+    # Data is already on the correct device thanks to the ExampleProvider
+    grids, labels, affinities = batch
+
+    pose_log, affinities_pred = model(grids)
+
+    # Compute combined loss for pose prediction and affinity prediction
+    loss = pose_loss(pose_log, labels) + affinity_loss(affinities_pred, affinities)
+
+    loss.backward()
+    # TODO: Gradient clipping
+    optimizer.step()
+
+    return loss.item()
+
+
+def _setup_trainer(model, optimizer, device, affinity: bool = False) -> Engine:
+    """
+    Setup training engine for binding pose prediction or binding pose and affinity
+    prediction.
+
+    Patameters
+    ----------
+    model:
+        Model to train
+    optimizer:
+        Optimizer
+    device: torch.device
+        Device
+    affinity: bool
+        Flag for affinity prediction (in addition to pose prediction)
+
+    Notes
+    -----
+    If :code:`affinity==True`, the model return both pose and affinity predictions,
+    which requites a custom training step to evaluate the combine loss function. The
+    custom training step is defined in :fun:`_train_step_pose_and_affinity`.
+    """
+    if affinity:
+        # Pose prediction and binding affinity prediction
+        # Create engine based on custom train step
+        trainer = Engine(
+            lambda trainer, batch: _train_step_pose_and_affinity(
+                trainer,
+                batch,
+                model,
+                optimizer,
+                pose_loss=nn.NLLLoss(),
+                affinity_loss=PseudoHuberLoss(delta=4.0),
+            )
+        )
+    else:
+        # Pose prediction only
+        trainer = create_supervised_trainer(model, optimizer, nn.NLLLoss(), device)
+
+    return trainer
+
+
+def _evaluation_step_pose_and_affinity(evaluator: Engine, batch, model):
+    """
+    Evaluate model for binding pose and affinity prediction.
+
+    Parameters
+    ----------
+    evaluator:
+        PyTorch Ignite :code:`Engine`
+    batch:
+        Batch data
+    model:
+        Model
+
+    Returns
+    -------
+    Tuple[torch.Tensor]
+        Class probabilities for pose prediction, affinity prediction, true pose labels
+        and experimental binding affinities
+
+    Notes
+    -----
+    The model returns the softmax of the last linear layer for binding pose prediction
+    (class probabilities) and the raw output of the last linear layer for binding
+    affinity prediction, together with the pose labels and experimental binding
+    affinities.
+    """
+    model.eval()
+    with torch.no_grad():
+        grids, labels, affinities = batch
+        pose_log, affinities_pred = model(grids)
+
+    output = {
+        "pose_log": pose_log,
+        "affinities_pred": affinities_pred,
+        "labels": labels,
+        "affinities": affinities,
+    }
+
+    return output
+
+
+def _setup_evaluator(model, metrics, device, affinity: bool = False) -> Engine:
+    """
+    Setup PyTorch Ignite :code:`Engine` for evaluation.
+
+    Parameters
+    ----------
+    model:
+        PyTorch model
+    metrics:
+        Evaluation metrics
+    device: torch.device
+        Device
+    affinity: bool
+        Flag for affinity prediction (in addition to pose prediction)
+
+    Returns
+    -------
+    ignite.Engine
+        PyTorch Ignite engine for evaluation
+
+    Notes
+    -----
+    For pose prediction the model is rather standard (single outpout) and therefore
+    the :code:`create_supervised_evaluator()` factory function is used. For both pose
+    and binding affinity prediction, the custom
+    :code:`_evaluation_step_pose_and_affinity` is used instead.
+    """
+    if affinity:
+        evaluator = Engine(
+            lambda evaluator, batch: _evaluation_step_pose_and_affinity(
+                evaluator, batch, model
+            )
+        )
+
+        # Add metrics to the evaluator engine
+        # Metrics need an output_tranform method in order to select the correct ouput
+        # from _evaluation_step_pose_and_affinity
+        for name, metric in metrics.items():
+            metric.attach(evaluator, name)
+
+    else:
+        evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
+
+    return evaluator
+
+
+# def _output_transform_pose_and_affinity(x, y, y_pred):
+#    """
+#    Output transformation for affinity prediction.
+#    """
+#    labels, affinities = y
+#    pose_log, affinities_pred = y_pred
+
+#    return pose_log, affinities_pred, labels, affinities
+
+
+def _output_transform_identity(args: Tuple[Any]) -> Tuple[Any]:
+    """
+    Output transformation that does nothing.
+
+    Parameters
+    ----------
+    args: Tuple[Any]
+        Tuple of arguments
+
+    Returns
+    -------
+    Tuple[Any]
+        Tuple of arguments unchanged
+
+    Notes
+    -----
+    Identity transformation when an :code:`output_transform` function is not needed
+    (default behaviour works well for single output model for pose prediction).
+    """
+    return args
+
+
+def _output_transform_select_pose(
+    output: Dict[str, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Parameters
+    ----------
+    output: Dict[str, ignite.metrics.Metric]
+        Engine output
+
+    Notes
+    -----
+    THis function is used as :code:`output_transform` in
+    :class:`ignite.metrics.metric.Metric` and allow to select pose results from
+    what the evaluator returns (that is,
+    :code:`(pose_log, affinities_pred, labels, affinities)` when :code:`affinity=True`).
+    See return of :fun:`_output_transform_pose_and_affinity`.
+
+    The output is activated, i.e. the :code:`log_softmax` output is transformed into
+    :code:`softmax`.
+    """
+    # Return pose class probabilities and true labels
+    return torch.exp(output["pose_log"]), output["labels"]
+
+
+def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Output transform for the ROC curve.
+
+    Parameters
+    ----------
+    output:
+        Engine output
+    affinity: bool
+        Flag for binding affinity prediction
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        Positive class probabilities and associated labels.
+
+    Notes
+    -----
+    https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
+    """
+    if affinity:
+        # Select pose prediction if binding affinity is predicted as well
+        pose, labels = _output_transform_select_pose(output)
+    else:
+        #
+        pose, labels = output
+
+    # Return probability estimates of the positive class
+    return pose[:, -1], labels
+
+
 def training(args):
+    """
+    Main function for training GNINA scoring function.
+
+    Parameters
+    ----------
+    args:
+        Command line arguments
+    """
     # Set random seed for reproducibility
     if args.seed is not None:
         molgrid.set_random_seed(args.seed)
@@ -246,21 +485,30 @@ def training(args):
     train_loader = GriddedExamplesLoader(
         example_provider=train_example_provider,
         grid_maker=grid_maker,
+        label_pos=args.label_pos,
+        affinity_pos=args.affinity_pos,
         random_translation=args.random_translation,
         random_rotation=args.random_rotation,
+        device=device,
     )
 
     if args.testfile is not None:
         test_loader = GriddedExamplesLoader(
             example_provider=test_example_provider,
             grid_maker=grid_maker,
+            label_pos=args.label_pos,
+            affinity_pos=args.affinity_pos,
             random_translation=args.random_translation,
             random_rotation=args.random_rotation,
+            device=device,
         )
 
         assert test_loader.dims == train_loader.dims
 
-    model = models_dict[args.model](train_loader.dims, affinity=False).to(device)
+    affinity: bool = True if args.affinity_pos is not None else False
+
+    # Create model
+    model = models_dict[args.model](train_loader.dims, affinity=affinity).to(device)
 
     optimizer = optim.SGD(
         model.parameters(),
@@ -269,23 +517,44 @@ def training(args):
         weight_decay=args.weight_decay,
     )
 
-    criterion = nn.NLLLoss()
-
-    trainer = create_supervised_trainer(model, optimizer, criterion, device)
+    trainer = _setup_trainer(model, optimizer, device, affinity=affinity)
 
     allmetrics = {
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "balanced_accuracy": metrics.Recall(average=True),
+        "balanced_accuracy": metrics.Recall(
+            average=True,
+            output_transform=_output_transform_select_pose
+            if affinity
+            else _output_transform_identity,
+        ),
         # Accuracy can be used directly without binarising the data since we are not
         # performing binary classification (Linear(out_features=1)) but we are
         # performing multiclass classification with 2 classes (Linear(out_features=2))
-        "accuracy": metrics.Accuracy(),
-        "classification": metrics.ClassificationReport(),
-        "roc_auc": ROC_AUC(output_transform=_activated_output_transform),
+        "accuracy": metrics.Accuracy(
+            output_transform=_output_transform_select_pose
+            if affinity
+            else _output_transform_identity
+        ),
+        # "classification": metrics.ClassificationReport(),
+        "roc_auc": ROC_AUC(
+            output_transform=lambda output: _output_transform_ROC(
+                output, affinity=affinity
+            ),
+            device=device,
+        ),
     }
 
-    evaluator = create_supervised_evaluator(model, metrics=allmetrics, device=device)
+    # evaluator = create_supervised_evaluator(
+    #    model,
+    #    output_transform=_output_transform_pose_and_affinity
+    #    if affinity
+    #    else lambda *args: args,
+    #    metrics=allmetrics,
+    #    device=device,
+    # )
+
+    evaluator = _setup_evaluator(model, allmetrics, device, affinity=affinity)
 
     # FIXME: This requires a second pass on the training set
     # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1

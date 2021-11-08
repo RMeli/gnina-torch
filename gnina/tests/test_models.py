@@ -24,7 +24,7 @@ def test_default2017_forward(batch_size, dims, x, device):
     pose_raw, affinity = model(x)
 
     assert pose_raw.shape == (batch_size, 2)
-    assert affinity.shape == (batch_size, 1)
+    assert affinity.shape == (batch_size,)
 
 
 def test_default2018_forward(batch_size, dims, x, device):

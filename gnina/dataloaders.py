@@ -53,6 +53,10 @@ class GriddedExamplesLoader:
 
         self.dims = grid_maker.grid_dimensions(self.num_types)
 
+    # TODO: Check this is what we want
+    # TODO: By default, epoch length is defined by len(data)
+    # TODO: If data is a finite data iterator with unknown length epoch_length
+    # TODO: will be automatically determined when data iterator is exhausted.
     def __len__(self):
         """
         Return length of the epoch (number of examples).
@@ -78,7 +82,7 @@ class GriddedExamplesLoader:
             raise ValueError("Unknown iteration scheme {settings.iteration_scheme}.")
 
     # TODO: Avoid padding with next epoch?
-    # TODO: Does this happen with the currenti iteration scheme?)
+    # TODO: Does this happen with the current iteration scheme?)
     def __next__(self):
         """
         Get next batch of gridded examples and corresponding labels.
@@ -120,7 +124,12 @@ class GriddedExamplesLoader:
         # libmolgrid only supports float input
         labels = labels.long()
 
-        return grids, labels
+        if self.affinity_pos is None:
+            # Return grids and labels
+            return grids, labels
+        else:
+            # Return grids, labels and affinities
+            return grids, labels, affinities
 
     def __iter__(self):
         return self

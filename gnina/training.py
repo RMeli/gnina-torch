@@ -2,6 +2,7 @@ import argparse
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
+import ignite
 import molgrid
 import numpy as np
 import torch
@@ -191,9 +192,29 @@ def _setup_grid_maker(args) -> molgrid.GridMaker:
 
 def _train_step_pose_and_affinity(
     trainer: Engine, batch, model, optimizer, pose_loss, affinity_loss
-):
+) -> float:
     """
-    Update for pose and affinity prediction.
+    Training step for pose and affinity prediction.
+
+    Parameters
+    ----------
+    trainer: Engine
+        PyTorch Ignite engine for training
+    batch:
+        Batch of data
+    model:
+        PyTorch model
+    optimizer:
+        Pytorch optimizer
+    pose_loss:
+        Loss function for pose prediction
+    affinity_loss:
+        Loss function for binding affinity prediction
+
+    Returns
+    -------
+    float
+        Loss
     """
     model.train()
     optimizer.zero_grad()
@@ -445,7 +466,23 @@ def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.T
     return pose[:, -1], labels
 
 
-def _setup_metrics(affinity: bool, device):
+def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
+    """
+    Define metrics to be computed at the end of an epoch (evaluation).
+
+    Parameters
+    ----------
+    affinity: bool
+        Flag for binding affinity predictions
+    device: torch.device
+        Device
+
+    Returns
+    -------
+    Dict[str, ignite.metrics.Metric]
+        Dictionary of PyTorch Ignite metrics
+    """
+
     # Pose prediction metrics
     m = {
         # Balanced accuracy is the average recall over all classes
@@ -490,7 +527,21 @@ def _setup_metrics(affinity: bool, device):
     return m
 
 
-def _log_print(title, epoch, metrics, affinity: bool):
+def _log_print(title: str, epoch: int, metrics, affinity: bool):
+    """
+    Print metrics to the console.
+
+    Parameters
+    ----------
+    title: str
+        Title to print
+    epoch: int
+        Epoch number
+    metrics:
+        Dictionary of metrics
+    affinity: bool
+        Flag for binding affinity predictions
+    """
     print(f">>> {title} - Epoch[{epoch}] <<<")
 
     # Pose classification metriccs

@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 from typing import Any, Dict, List, Optional, Tuple
 
 import ignite
@@ -555,6 +556,13 @@ def _log_print(title: str, epoch: int, metrics, affinity: bool):
         print(f"MSE: {metrics['MSE']:.2f}")
 
 
+def _print_args(args, header=None, stream=sys.stdout):
+    if header is not None:
+        print(header, file=stream)
+    for name, value in vars(args).items():
+        print(f"{name} = {value!r}", file=stream)
+
+
 def training(args):
     """
     Main function for training GNINA scoring function.
@@ -564,6 +572,8 @@ def training(args):
     args:
         Command line arguments
     """
+    _print_args(args, header="--- GNINA TRAINING ---")
+
     # Set random seed for reproducibility
     if args.seed is not None:
         molgrid.set_random_seed(args.seed)

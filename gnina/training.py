@@ -422,7 +422,34 @@ def _output_transform_select_pose(
     :code:`softmax`.
     """
     # Return pose class probabilities and true labels
+    # log_softmax is transformed into softmax to get the class probabilities
     return torch.exp(output["pose_log"]), output["labels"]
+
+
+def _output_transform_select_affinity(
+    output: Dict[str, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Parameters
+    ----------
+    output: Dict[str, ignite.metrics.Metric]
+        Engine output
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        Predicted binding affnity and experimental binding affinity
+
+    Notes
+    -----
+    This function is used as :code:`output_transform` in
+    :class:`ignite.metrics.metric.Metric` and allow to select affinity predictions from
+    what the evaluator returns (that is,
+    :code:`(pose_log, affinities_pred, labels, affinities)` when :code:`affinity=True`).
+    See return of :fun:`_output_transform_pose_and_affinity`.
+    """
+    # Return pose class probabilities and true labels
+    return output["affinities_pred"], output["affinities"]
 
 
 def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -449,11 +476,69 @@ def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.T
         # Select pose prediction if binding affinity is predicted as well
         pose, labels = _output_transform_select_pose(output)
     else:
-        #
         pose, labels = output
 
     # Return probability estimates of the positive class
     return pose[:, -1], labels
+
+
+def _setup_metrics(affinity: bool, device):
+    # Pose prediction metrics
+    m = {
+        # Balanced accuracy is the average recall over all classes
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
+        "balanced_accuracy": metrics.Recall(
+            average=True,
+            output_transform=_output_transform_select_pose
+            if affinity
+            else _output_transform_identity,
+        ),
+        # Accuracy can be used directly without binarising the data since we are not
+        # performing binary classification (Linear(out_features=1)) but we are
+        # performing multiclass classification with 2 classes (Linear(out_features=2))
+        "accuracy": metrics.Accuracy(
+            output_transform=_output_transform_select_pose
+            if affinity
+            else _output_transform_identity
+        ),
+        # "classification": metrics.ClassificationReport(),
+        "roc_auc": ROC_AUC(
+            output_transform=lambda output: _output_transform_ROC(
+                output, affinity=affinity
+            ),
+            device=device,
+        ),
+    }
+
+    # Affinity prediction metrics
+    if affinity:
+        m.update(
+            {
+                "MAE": metrics.MeanAbsoluteError(
+                    output_transform=_output_transform_select_affinity
+                ),
+                "MSE": metrics.MeanSquaredError(
+                    output_transform=_output_transform_select_affinity
+                ),
+            }
+        )
+
+    # Return dictionary with all metrics
+    return m
+
+
+def _log_print(title, epoch, metrics, affinity: bool):
+    print(f">>> {title} - Epoch[{epoch}] <<<")
+
+    # Pose classification metriccs
+    print(f"Accuracy: {metrics['accuracy']:.2f}")
+    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
+    print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True)
+
+    # Binding affinity prediction metrics
+    if affinity:
+        print(f"MAE: {metrics['MAE']:.2f}")
+        print(f"MSE: {metrics['MSE']:.2f}")
 
 
 def training(args):
@@ -519,40 +604,7 @@ def training(args):
 
     trainer = _setup_trainer(model, optimizer, device, affinity=affinity)
 
-    allmetrics = {
-        # Balanced accuracy is the average recall over all classes
-        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "balanced_accuracy": metrics.Recall(
-            average=True,
-            output_transform=_output_transform_select_pose
-            if affinity
-            else _output_transform_identity,
-        ),
-        # Accuracy can be used directly without binarising the data since we are not
-        # performing binary classification (Linear(out_features=1)) but we are
-        # performing multiclass classification with 2 classes (Linear(out_features=2))
-        "accuracy": metrics.Accuracy(
-            output_transform=_output_transform_select_pose
-            if affinity
-            else _output_transform_identity
-        ),
-        # "classification": metrics.ClassificationReport(),
-        "roc_auc": ROC_AUC(
-            output_transform=lambda output: _output_transform_ROC(
-                output, affinity=affinity
-            ),
-            device=device,
-        ),
-    }
-
-    # evaluator = create_supervised_evaluator(
-    #    model,
-    #    output_transform=_output_transform_pose_and_affinity
-    #    if affinity
-    #    else lambda *args: args,
-    #    metrics=allmetrics,
-    #    device=device,
-    # )
+    allmetrics = _setup_metrics(affinity, device)
 
     evaluator = _setup_evaluator(model, allmetrics, device, affinity=affinity)
 
@@ -561,23 +613,24 @@ def training(args):
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
         evaluator.run(train_loader)
-        metrics = evaluator.state.metrics
-        print(f">>> Train Results - Epoch[{trainer.state.epoch}] <<<")
-        print(f"Accuracy: {metrics['accuracy']:.2f}")
-        print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
-        print(f"ROC AUC: {metrics['roc_auc']:.2f}")
+        _log_print(
+            "Train Results",
+            trainer.state.epoch,
+            evaluator.state.metrics,
+            affinity=affinity,
+        )
 
     if args.testfile is not None:
 
         @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
         def log_test_results(trainer):
             evaluator.run(test_loader)
-            metrics = evaluator.state.metrics
-            print(f">>> Test Results - Epoch[{trainer.state.epoch}] <<<")
-            print(f"Accuracy: {metrics['accuracy']:.2f}")
-            print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
-            print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True)
-            # print(metrics["classification"])
+            _log_print(
+                "Test Results",
+                trainer.state.epoch,
+                evaluator.state.metrics,
+                affinity=affinity,
+            )
 
     # TODO: Save input parameters as well
     to_save = {"model": model, "optimizer": optimizer}

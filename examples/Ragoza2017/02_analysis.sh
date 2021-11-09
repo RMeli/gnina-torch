@@ -8,8 +8,8 @@ do
     do
         dir="${aug}-${i}"
 
-        grep -A 3 "Train" ${dir}/training.log | grep "ROC AUC" | awk '{print $3}' > ${dir}/test.dat
-        grep -A 3 "Test" ${dir}/training.log | grep "ROC AUC" | awk '{print $3}' > ${dir}/train.dat
+        grep -A 3 "Train" ${dir}/training.log | grep "ROC AUC" | awk '{print $3}' > ${dir}/train.dat
+        grep -A 3 "Test" ${dir}/training.log | grep "ROC AUC" | awk '{print $3}' > ${dir}/test.dat
     done
 
 done

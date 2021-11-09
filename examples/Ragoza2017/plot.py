@@ -24,5 +24,5 @@ for a in ["augmentation", "no-augmentation"]:
 # print(df_all)
 
 sns.lineplot(x="Epoch", y="ROC-AUC", hue="Augmentation", style="Phase", data=df_all)
-plt.savefig("augmentation.png")
-plt.savefig("augmentation.pdf")
+plt.savefig("ROC-AUC.png")
+plt.savefig("ROC-AUC.pdf")

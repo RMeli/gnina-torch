@@ -20,6 +20,11 @@ Training is performed for 50 "small" epoch, where a "small" epoch is defined as 
 
 ## Evaluation
 
+The ROC-AUC metric is reported in function of the number of training epochs with and without data augmentation.
+
+![ROC-AUC](assets/ROC-AUC.png)
+
+This reproduces Fig. 3 of Ragoza *et al.* The difference between the two figures is that in the original implementation the number of iterations is reported, while here we report the number of "small" epochs (where a "small" epoch ends when system have sampled at most once).
 ## Citations
 
 > Protein–Ligand Scoring with Convolutional Neural Networks,

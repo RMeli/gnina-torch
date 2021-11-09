@@ -600,7 +600,7 @@ def training(args):
     # Define output streams for logging
     outfile = open(os.path.join(args.out_dir, "training.log"), "w")
     if not args.silent:
-        outstreams = [sys.stdoutm, outfile]
+        outstreams = [sys.stdout, outfile]
     else:
         outstreams = [outfile]
 

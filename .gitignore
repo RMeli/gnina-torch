@@ -114,3 +114,4 @@ examples/Francoeur2020/PDBbind2016/data/
 examples/Ragoza2017/*
 !examples/Ragoza2017/*.sh
 !examples/Ragoza2017/*.md
+!examples/Ragoza2017/*.py

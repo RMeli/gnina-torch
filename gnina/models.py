@@ -308,7 +308,9 @@ class Default2018(nn.Module):
 
         if self.predict_affinity:
             affinity = self.affinity(x)
-            return pose_log, affinity
+            # Squeeze last (dummy) dimension of affinity prediction
+            # This allows to match the shape (batch_size,) of the target tensor
+            return pose_log, affinity.squeeze(-1)
         else:
             return pose_log
 
@@ -563,7 +565,9 @@ class Dense(nn.Module):
 
         if self.predict_affinity:
             affinity = self.affinity(x)
-            return pose_log, affinity
+            # Squeeze last (dummy) dimension of affinity prediction
+            # This allows to match the shape (batch_size,) of the target tensor
+            return pose_log, affinity.squeeze(-1)
         else:
             return pose_log
 

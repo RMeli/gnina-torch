@@ -100,6 +100,26 @@ def options(args: Optional[List[str]] = None):
         help="molgrid iteration sheme",
         choices=["small", "large"],
     )
+    # lr_dynamic, originally called --dynamic
+    parser.add_argument(
+        "--lr_dynamic",
+        action="store_true",
+        help="Adjust learning rate in response to training",
+    )
+    # lr_patience, originally called --step_when
+    # Acts on epochs, not on iterations
+    parser.add_argument(
+        "--lr_patience",
+        type=int,
+        default=5,
+        help="Number of epochs without improvement before learning rate update",
+    )
+    # lr_reduce, originally called --step_reduce
+    parser.add_argument(
+        "--lr_reduce", type=float, default=0.1, help="Learning rate reduction factor"
+    )
+    # lr_min  default value set to match --step_end_cnt default value (3 reductions)
+    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
 
     # Misc
     parser.add_argument(
@@ -248,17 +268,37 @@ def training(args):
         "accuracy": metrics.Accuracy(),
         "classification": metrics.ClassificationReport(),
         "roc_auc": ROC_AUC(output_transform=_activated_output_transform),
+        "loss": metrics.Loss(criterion),
     }
 
     evaluator = create_supervised_evaluator(model, metrics=allmetrics, device=device)
 
-    # FIXME: This requires a second pass on the training set
-    # FIXME: Measures should be accumulated: https://pytorch.org/ignite/quickstart.html#f1
+    if args.lr_dynamic:
+        torch_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="max",
+            factor=args.lr_reduce,
+            patience=args.lr_patience,
+            min_lr=args.lr_min,
+            verbose=False,
+        )
+
+        # TODO: Save history
+        # Event.COMPLETED since we want the full evaluation to be completed
+        @evaluator.on(Events.COMPLETED)
+        def scheduler(evaluator):
+            metrics = evaluator.state.metrics
+            torch_scheduler.step(metrics["loss"])
+
+            assert len(optimizer.param_groups) == 1
+            print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
+
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
         evaluator.run(train_loader)
         metrics = evaluator.state.metrics
         print(f">>> Train Results - Epoch[{trainer.state.epoch}] <<<")
+        print(f"Loss: {metrics['loss']:.5f}")
         print(f"Accuracy: {metrics['accuracy']:.2f}")
         print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
         print(f"ROC AUC: {metrics['roc_auc']:.2f}")
@@ -270,6 +310,7 @@ def training(args):
             evaluator.run(test_loader)
             metrics = evaluator.state.metrics
             print(f">>> Test Results - Epoch[{trainer.state.epoch}] <<<")
+            print(f"Loss: {metrics['loss']:.5f}")
             print(f"Accuracy: {metrics['accuracy']:.2f}")
             print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}")
             print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True)

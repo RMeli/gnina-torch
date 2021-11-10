@@ -110,7 +110,8 @@ ENV/
 .idea
 
 # data
-examples/Francoeur2020/PDBbind2016/data/
+examples/Francoeur2020/data/
+examples/Francoeur2020/*.tar.gz
 examples/Ragoza2017/*
 !examples/Ragoza2017/*.sh
 !examples/Ragoza2017/*.md

@@ -597,6 +597,9 @@ def training(args):
         Command line arguments
     """
 
+    # Create necessary directories if not already present
+    os.makedirs(args.out_dir, exist_ok=True)
+
     # Define output streams for logging
     outfile = open(os.path.join(args.out_dir, "training.log"), "w")
     if not args.silent:

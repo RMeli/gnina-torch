@@ -580,6 +580,7 @@ def _log_print(title: str, epoch: int, metrics, affinity: bool, stream=sys.stdou
     if affinity:
         print(f"MAE: {metrics['MAE']:.2f}", file=stream)
         print(f"MSE: {metrics['MSE']:.2f}", file=stream)
+        print(f"RMSE: {metrics['RMSE']:.2f}", file=stream)
 
 
 def _print_args(args, header=None, stream=sys.stdout):
@@ -658,6 +659,10 @@ def training(args):
 
     # Create model
     model = models_dict[args.model](train_loader.dims, affinity=affinity).to(device)
+
+    # Compile model into TorchScript
+    # FIXME: Does not work because of different return types between pose and affinity
+    # model = torch.jit.script(model)
 
     optimizer = optim.SGD(
         model.parameters(),

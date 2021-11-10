@@ -542,6 +542,9 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
                 "MSE": metrics.MeanSquaredError(
                     output_transform=_output_transform_select_affinity
                 ),
+                "RMSE": metrics.RootMeanSquaredError(
+                    output_transform=_output_transform_select_affinity
+                ),
             }
         )
 

@@ -1,7 +1,11 @@
+"""
+PyTorch implementation of GNINA scoring function's Caffe training script.
+"""
+
 import argparse
 import os
 import sys
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import ignite
 import molgrid
@@ -10,12 +14,7 @@ import torch
 from ignite import metrics
 from ignite.contrib.handlers import ProgressBar
 from ignite.contrib.metrics import ROC_AUC
-from ignite.engine import (
-    Engine,
-    Events,
-    create_supervised_evaluator,
-    create_supervised_trainer,
-)
+from ignite.engine import Engine, Events, create_supervised_trainer
 from ignite.handlers import Checkpoint
 from torch import nn, optim
 
@@ -137,6 +136,26 @@ def options(args: Optional[List[str]] = None):
         help="molgrid iteration sheme",
         choices=_iteration_schemes.keys(),
     )
+    # lr_dynamic, originally called --dynamic
+    parser.add_argument(
+        "--lr_dynamic",
+        action="store_true",
+        help="Adjust learning rate in response to training",
+    )
+    # lr_patience, originally called --step_when
+    # Acts on epochs, not on iterations
+    parser.add_argument(
+        "--lr_patience",
+        type=int,
+        default=5,
+        help="Number of epochs without improvement before learning rate update",
+    )
+    # lr_reduce, originally called --step_reduce
+    parser.add_argument(
+        "--lr_reduce", type=float, default=0.1, help="Learning rate reduction factor"
+    )
+    # lr_min  default value set to match --step_end_cnt default value (3 reductions)
+    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
 
     # Misc
     parser.add_argument(
@@ -256,7 +275,7 @@ def _train_step_pose_and_affinity(
     return loss.item()
 
 
-def _setup_trainer(model, optimizer, device, affinity: bool = False) -> Engine:
+def _setup_trainer(model, optimizer, device, pose_loss, affinity_loss) -> Engine:
     """
     Setup training engine for binding pose prediction or binding pose and affinity
     prediction.
@@ -278,7 +297,7 @@ def _setup_trainer(model, optimizer, device, affinity: bool = False) -> Engine:
     which requites a custom training step to evaluate the combine loss function. The
     custom training step is defined in :fun:`_train_step_pose_and_affinity`.
     """
-    if affinity:
+    if affinity_loss is not None:
         # Pose prediction and binding affinity prediction
         # Create engine based on custom train step
         trainer = Engine(
@@ -287,13 +306,13 @@ def _setup_trainer(model, optimizer, device, affinity: bool = False) -> Engine:
                 batch,
                 model,
                 optimizer,
-                pose_loss=nn.NLLLoss(),
-                affinity_loss=PseudoHuberLoss(delta=4.0),
+                pose_loss=pose_loss,
+                affinity_loss=affinity_loss,
             )
         )
     else:
         # Pose prediction only
-        trainer = create_supervised_trainer(model, optimizer, nn.NLLLoss(), device)
+        trainer = create_supervised_trainer(model, optimizer, pose_loss, device)
 
     return trainer
 
@@ -319,10 +338,9 @@ def _evaluation_step_pose_and_affinity(evaluator: Engine, batch, model):
 
     Notes
     -----
-    The model returns the softmax of the last linear layer for binding pose prediction
-    (class probabilities) and the raw output of the last linear layer for binding
-    affinity prediction, together with the pose labels and experimental binding
-    affinities.
+    The model returns the log softmax of the last linear layer for binding pose
+    prediction (log class probabilities) and the raw output of the last linear layer for
+    binding affinity predictions.
     """
     model.eval()
     with torch.no_grad():
@@ -334,6 +352,47 @@ def _evaluation_step_pose_and_affinity(evaluator: Engine, batch, model):
         "affinities_pred": affinities_pred,
         "labels": labels,
         "affinities": affinities,
+    }
+
+    return output
+
+
+def _evaluation_step_pose(evaluator: Engine, batch, model):
+    """
+    Evaluate model for binding pose prediction only.
+
+    Parameters
+    ----------
+    evaluator:
+        PyTorch Ignite :code:`Engine`
+    batch:
+        Batch data
+    model:
+        Model
+
+    Returns
+    -------
+    Tuple[torch.Tensor]
+        Class probabilities for pose prediction and true pose labels
+
+    Notes
+    -----
+    While not strictly necessary (the default PyTorch Ignite evaluator would work well
+    in the case of pose-prediction only), this function is used to return a dictionary
+    of the output with the same key used in :fun:`_evaluation_step_pose_and_affinity`.
+    This allows to simplify the code of the learning rate scheduler function. This
+    function also allows consistency in allowing the use of
+    :fun:`_output_transform_select_pose` for both pose prediction only and binding pose
+    prediction with bindign affinity prediction.
+    """
+    model.eval()
+    with torch.no_grad():
+        grids, labels = batch
+        pose_log = model(grids)
+
+    output = {
+        "pose_log": pose_log,
+        "labels": labels,
     }
 
     return output
@@ -372,39 +431,18 @@ def _setup_evaluator(model, metrics, device, affinity: bool = False) -> Engine:
                 evaluator, batch, model
             )
         )
-
-        # Add metrics to the evaluator engine
-        # Metrics need an output_tranform method in order to select the correct ouput
-        # from _evaluation_step_pose_and_affinity
-        for name, metric in metrics.items():
-            metric.attach(evaluator, name)
-
     else:
-        evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
+        evaluator = Engine(
+            lambda evaluator, batch: _evaluation_step_pose(evaluator, batch, model)
+        )
+
+    # Add metrics to the evaluator engine
+    # Metrics need an output_tranform method in order to select the correct ouput
+    # from _evaluation_step_pose_and_affinity
+    for name, metric in metrics.items():
+        metric.attach(evaluator, name)
 
     return evaluator
-
-
-def _output_transform_identity(args: Tuple[Any]) -> Tuple[Any]:
-    """
-    Output transformation that does nothing.
-
-    Parameters
-    ----------
-    args: Tuple[Any]
-        Tuple of arguments
-
-    Returns
-    -------
-    Tuple[Any]
-        Tuple of arguments unchanged
-
-    Notes
-    -----
-    Identity transformation when an :code:`output_transform` function is not needed
-    (default behaviour works well for single output model for pose prediction).
-    """
-    return args
 
 
 def _output_transform_select_pose(
@@ -458,7 +496,7 @@ def _output_transform_select_affinity(
     return output["affinities_pred"], output["affinities"]
 
 
-def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.Tensor]:
+def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Output transform for the ROC curve.
 
@@ -478,11 +516,8 @@ def _output_transform_ROC(output, affinity: bool) -> Tuple[torch.Tensor, torch.T
     -----
     https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
     """
-    if affinity:
-        # Select pose prediction if binding affinity is predicted as well
-        pose, labels = _output_transform_select_pose(output)
-    else:
-        pose, labels = output
+    # Select pose prediction
+    pose, labels = _output_transform_select_pose(output)
 
     # Return probability estimates of the positive class
     return pose[:, -1], labels
@@ -510,24 +545,15 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
         "balanced_accuracy": metrics.Recall(
-            average=True,
-            output_transform=_output_transform_select_pose
-            if affinity
-            else _output_transform_identity,
+            average=True, output_transform=_output_transform_select_pose
         ),
         # Accuracy can be used directly without binarising the data since we are not
         # performing binary classification (Linear(out_features=1)) but we are
         # performing multiclass classification with 2 classes (Linear(out_features=2))
-        "accuracy": metrics.Accuracy(
-            output_transform=_output_transform_select_pose
-            if affinity
-            else _output_transform_identity
-        ),
+        "accuracy": metrics.Accuracy(output_transform=_output_transform_select_pose),
         # "classification": metrics.ClassificationReport(),
         "roc_auc": ROC_AUC(
-            output_transform=lambda output: _output_transform_ROC(
-                output, affinity=affinity
-            ),
+            output_transform=lambda output: _output_transform_ROC(output),
             device=device,
         ),
     }
@@ -671,10 +697,15 @@ def training(args):
         weight_decay=args.weight_decay,
     )
 
-    trainer = _setup_trainer(model, optimizer, device, affinity=affinity)
+    # Define loss functions
+    pose_loss = nn.NLLLoss()
+    affinity_loss = PseudoHuberLoss(delta=4.0) if affinity else None
+
+    trainer = _setup_trainer(
+        model, optimizer, device, pose_loss=pose_loss, affinity_loss=affinity_loss
+    )
 
     allmetrics = _setup_metrics(affinity, device)
-
     evaluator = _setup_evaluator(model, allmetrics, device, affinity=affinity)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
@@ -689,6 +720,34 @@ def training(args):
                 affinity=affinity,
                 stream=outstream,
             )
+
+    if args.lr_dynamic:
+        torch_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="max",
+            factor=args.lr_reduce,
+            patience=args.lr_patience,
+            min_lr=args.lr_min,
+            verbose=False,
+        )
+
+        # TODO: Save lr history
+        # Event.COMPLETED since we want the full evaluation to be completed
+        @evaluator.on(Events.COMPLETED)
+        def scheduler(evaluator):
+            output = evaluator.state.output
+
+            with torch.no_grad():
+                loss = pose_loss(output["pose_log"], output["labels"])
+                if affinity:
+                    loss += affinity_loss(
+                        output["affinity_pred"], output["affinity_labels"]
+                    )
+
+            torch_scheduler.step(loss)
+
+            assert len(optimizer.param_groups) == 1
+            print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
 
     if args.testfile is not None:
 
@@ -724,6 +783,7 @@ def training(args):
     trainer.run(train_loader, max_epochs=args.iterations)
 
     # Close log file
+    # TODO: rename as logfile!
     outfile.close()
 
 

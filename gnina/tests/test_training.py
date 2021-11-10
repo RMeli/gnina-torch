@@ -44,7 +44,7 @@ def test_options(trainfile, model, gpu):
     assert args.seed == seed
 
 
-def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot, device):
+def test_setup_example_provider_default(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -53,11 +53,20 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot, devi
 
     assert not args.shuffle
 
-    e, gmaker = training._setup_example_provider_and_grid_maker(args)
+    e = training._setup_example_provider(args.trainfile, args)
 
     assert e.num_labels() == 3  # Three labels in small.types
     assert e.size() == 3  # Three examples in small.types
     assert e.num_types() == 28
+
+
+def test_setup_grid_maker_default(trainfile, dataroot, device):
+    args = training.options(
+        [trainfile, "-d", dataroot, "--no_shuffle", "-g", str(device)]
+    )
+
+    gmaker = training._setup_grid_maker(args)
+
     assert gmaker.get_dimension() == pytest.approx(23.5)
     assert gmaker.get_resolution() == pytest.approx(0.5)
     assert gmaker.grid_dimensions(28) == (28, 48, 48, 48)
@@ -66,6 +75,7 @@ def test_setup_example_provider_and_grid_maker_default(trainfile, dataroot, devi
 def test_example_provider(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
+    batch_size = 2
     args = training.options(
         [
             trainfile,
@@ -76,16 +86,20 @@ def test_example_provider(trainfile, dataroot, device):
             "1",
             "-g",
             str(device),
+            "--batch_size",
+            str(batch_size),
         ]
     )
 
     assert not args.shuffle
 
-    e, gmaker = training._setup_example_provider_and_grid_maker(args)
+    e = training._setup_example_provider(args.trainfile, args)
 
     batch_size = 2
 
-    batch = e.next_batch(batch_size)
+    batch = next(e)
+
+    assert len(batch) == batch_size
 
     labels = torch.zeros(batch_size, device=device)
     affinities = torch.zeros(batch_size, device=device)
@@ -108,18 +122,28 @@ def test_example_provider(trainfile, dataroot, device):
 def test_grid_maker(trainfile, dataroot, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
+    # Manually set batch size
+    batch_size = 2
     args = training.options(
-        [trainfile, "-d", dataroot, "--no_shuffle", "-g", str(device)]
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "-g",
+            str(device),
+            "--batch_size",
+            str(batch_size),
+        ]
     )
 
     assert not args.shuffle
 
-    e, gmaker = training._setup_example_provider_and_grid_maker(args)
+    e = training._setup_example_provider(args.trainfile, args)
+    gmaker = training._setup_grid_maker(args)
     dims = gmaker.grid_dimensions(e.num_types())
 
-    batch_size = 2
-
-    batch = e.next_batch(batch_size)
+    batch = next(e)
 
     grid = torch.zeros((batch_size, *dims), device=device)
     assert not any(grid[grid > 0.0])
@@ -211,7 +235,7 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
             "--seed",
             "42",
             "--progress_bar",
-            "--dynamic",
+            "--lr_dynamic",
             "--lr_patience",
             "1",
         ]

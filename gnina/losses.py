@@ -14,7 +14,7 @@ class PseudoHuberLoss(nn.Module):
 
     https://github.com/gnina/gnina/blob/master/caffe/src/caffe/layers/affinity_loss_layer.cpp
 
-    Definition of preudo-Huber loss:
+    Definition of pseudo-Huber loss:
     https://en.wikipedia.org/wiki/Huber_loss#Pseudo-Huber_loss_function
     """
 

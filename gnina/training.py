@@ -14,7 +14,7 @@ import torch
 from ignite import metrics
 from ignite.contrib.handlers import ProgressBar
 from ignite.contrib.metrics import ROC_AUC
-from ignite.engine import Engine, Events, create_supervised_trainer
+from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint
 from torch import nn, optim
 
@@ -156,6 +156,12 @@ def options(args: Optional[List[str]] = None):
     )
     # lr_min  default value set to match --step_end_cnt default value (3 reductions)
     parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
+    parser.add_argument(
+        "--clip_gradients",
+        type=float,
+        default=10.0,
+        help="Gradients threshold (for clipping)",
+    )
 
     # Misc
     parser.add_argument(
@@ -231,8 +237,70 @@ def _setup_grid_maker(args) -> molgrid.GridMaker:
     return grid_maker
 
 
+def _train_step_pose(
+    trainer: Engine,
+    batch,
+    model: nn.Module,
+    optimizer,
+    pose_loss: nn.Module,
+    clip_gradients: float,
+) -> float:
+    """
+    Training step for pose prediction.
+
+    Parameters
+    ----------
+    trainer: Engine
+        PyTorch Ignite engine for training
+    batch:
+        Batch of data
+    model:
+        PyTorch model
+    optimizer:
+        Pytorch optimizer
+    pose_loss:
+        Loss function for pose prediction
+    clip_gradients:
+        Gradient clipping threshold
+
+    Returns
+    -------
+    float
+        Loss
+
+    Notes
+    -----
+    Gradients are clipped by norm and not by value.
+    """
+    model.train()
+    optimizer.zero_grad()
+
+    # Data is already on the correct device thanks to the ExampleProvider
+    grids, labels = batch
+
+    pose_log = model(grids)
+
+    # Compute loss for pose prediction
+    loss = pose_loss(pose_log, labels)
+
+    loss.backward()
+
+    # TODO: Double check that gradient clipping by norm corresponds to the Caffe
+    # implementation
+    nn.utils.clip_grad_norm_(model.parameters(), clip_gradients)
+    optimizer.step()
+
+    return loss.item()
+
+
 def _train_step_pose_and_affinity(
-    trainer: Engine, batch, model, optimizer, pose_loss, affinity_loss
+    trainer: Engine,
+    batch,
+    model: nn.Module,
+    optimizer,
+    pose_loss: nn.Module,
+    affinity_loss: nn.Module,
+    clip_gradients: float,
 ) -> float:
     """
     Training step for pose and affinity prediction.
@@ -251,11 +319,17 @@ def _train_step_pose_and_affinity(
         Loss function for pose prediction
     affinity_loss:
         Loss function for binding affinity prediction
+    clip_gradients:
+        Gradient clipping threshold
 
     Returns
     -------
     float
         Loss
+
+    Notes
+    -----
+    Gradients are clipped by norm and not by value.
     """
     model.train()
     optimizer.zero_grad()
@@ -269,13 +343,18 @@ def _train_step_pose_and_affinity(
     loss = pose_loss(pose_log, labels) + affinity_loss(affinities_pred, affinities)
 
     loss.backward()
-    # TODO: Gradient clipping
+
+    # TODO: Double check that gradient clipping by norm corresponds to the Caffe
+    # implementation
+    nn.utils.clip_grad_norm_(model.parameters(), clip_gradients)
     optimizer.step()
 
     return loss.item()
 
 
-def _setup_trainer(model, optimizer, device, pose_loss, affinity_loss) -> Engine:
+def _setup_trainer(
+    model, optimizer, device, pose_loss, affinity_loss, clip_gradients: float
+) -> Engine:
     """
     Setup training engine for binding pose prediction or binding pose and affinity
     prediction.
@@ -288,14 +367,19 @@ def _setup_trainer(model, optimizer, device, pose_loss, affinity_loss) -> Engine
         Optimizer
     device: torch.device
         Device
-    affinity: bool
-        Flag for affinity prediction (in addition to pose prediction)
+    pose_loss:
+        Loss function for pose prediction
+    affinity_loss:
+        Loss function for affinity prediction
+    clip_gradients:
+        Gradient clipping threshold
 
     Notes
     -----
-    If :code:`affinity==True`, the model return both pose and affinity predictions,
-    which requites a custom training step to evaluate the combine loss function. The
-    custom training step is defined in :fun:`_train_step_pose_and_affinity`.
+    If :code:`affinity_loss is Non e`, the model return both pose and affinity
+    predictions, which requites a custom training step to evaluate the combine loss
+    function. The custom training step is defined in
+    :fun:`_train_step_pose_and_affinity`.
     """
     if affinity_loss is not None:
         # Pose prediction and binding affinity prediction
@@ -308,11 +392,22 @@ def _setup_trainer(model, optimizer, device, pose_loss, affinity_loss) -> Engine
                 optimizer,
                 pose_loss=pose_loss,
                 affinity_loss=affinity_loss,
+                clip_gradients=clip_gradients,
             )
         )
     else:
-        # Pose prediction only
-        trainer = create_supervised_trainer(model, optimizer, pose_loss, device)
+        # Pose prediction and binding affinity prediction
+        # Create engine based on custom train step
+        trainer = Engine(
+            lambda trainer, batch: _train_step_pose(
+                trainer,
+                batch,
+                model,
+                optimizer,
+                pose_loss=pose_loss,
+                clip_gradients=clip_gradients,
+            )
+        )
 
     return trainer
 
@@ -398,7 +493,7 @@ def _evaluation_step_pose(evaluator: Engine, batch, model):
     return output
 
 
-def _setup_evaluator(model, metrics, device, affinity: bool = False) -> Engine:
+def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
     """
     Setup PyTorch Ignite :code:`Engine` for evaluation.
 
@@ -408,8 +503,6 @@ def _setup_evaluator(model, metrics, device, affinity: bool = False) -> Engine:
         PyTorch model
     metrics:
         Evaluation metrics
-    device: torch.device
-        Device
     affinity: bool
         Flag for affinity prediction (in addition to pose prediction)
 
@@ -578,7 +671,9 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
     return m
 
 
-def _log_print(title: str, epoch: int, metrics, affinity: bool, stream=sys.stdout):
+def _log_print(
+    title: str, epoch: int, metrics, output, pose_loss, affinity_loss, stream=sys.stdout
+):
     """
     Print metrics to the console.
 
@@ -598,22 +693,35 @@ def _log_print(title: str, epoch: int, metrics, affinity: bool, stream=sys.stdou
     print(f">>> {title} - Epoch[{epoch}] <<<", file=stream)
 
     # Pose classification metriccs
-    print(f"Accuracy: {metrics['accuracy']:.2f}", file=stream)
-    print(f"Balanced accuracy: {metrics['balanced_accuracy']:.2f}", file=stream)
-    print(f"ROC AUC: {metrics['roc_auc']:.2f}", flush=True, file=stream)
+    print(f"    Accuracy: {metrics['accuracy']:.2f}", file=stream)
+    print(f"    Balanced accuracy: {metrics['balanced_accuracy']:.2f}", file=stream)
+    print(f"    ROC AUC: {metrics['roc_auc']:.2f}", flush=True, file=stream)
+
+    loss = pose_loss(output["pose_log"], output["labels"])
+    print(f"    Loss (pose): {loss:.5f}", file=stream)
 
     # Binding affinity prediction metrics
-    if affinity:
-        print(f"MAE: {metrics['MAE']:.2f}", file=stream)
-        print(f"MSE: {metrics['MSE']:.2f}", file=stream)
-        print(f"RMSE: {metrics['RMSE']:.2f}", file=stream)
+    if affinity_loss is not None:
+        print(f"    MAE: {metrics['MAE']:.2f}", file=stream)
+        print(f"    MSE: {metrics['MSE']:.2f}", file=stream)
+        print(f"    RMSE: {metrics['RMSE']:.2f}", file=stream)
+
+        al = affinity_loss(output["affinities_pred"], output["affinities"])
+        print(f"    Loss (affinity): {al:.5f}", file=stream)
+
+        loss += al
+
+    print(f"    Loss: {loss:.5f}", file=stream)
 
 
 def _print_args(args, header=None, stream=sys.stdout):
     if header is not None:
         print(header, file=stream)
     for name, value in vars(args).items():
-        print(f"{name} = {value!r}", file=stream)
+        if type(value) is float:
+            print(f"{name}: {value:.5E}", file=stream)
+        else:
+            print(f"{name} = {value!r}", file=stream)
     print("", file=stream, flush=True)
 
 
@@ -702,11 +810,16 @@ def training(args):
     affinity_loss = PseudoHuberLoss(delta=4.0) if affinity else None
 
     trainer = _setup_trainer(
-        model, optimizer, device, pose_loss=pose_loss, affinity_loss=affinity_loss
+        model,
+        optimizer,
+        device,
+        pose_loss=pose_loss,
+        affinity_loss=affinity_loss,
+        clip_gradients=args.clip_gradients,
     )
 
     allmetrics = _setup_metrics(affinity, device)
-    evaluator = _setup_evaluator(model, allmetrics, device, affinity=affinity)
+    evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
@@ -717,7 +830,9 @@ def training(args):
                 "Train Results",
                 trainer.state.epoch,
                 evaluator.state.metrics,
-                affinity=affinity,
+                evaluator.state.output,
+                pose_loss=pose_loss,
+                affinity_loss=affinity_loss,
                 stream=outstream,
             )
 
@@ -760,12 +875,17 @@ def training(args):
                     "Test Results",
                     trainer.state.epoch,
                     evaluator.state.metrics,
-                    affinity=affinity,
+                    evaluator.state.output,
+                    pose_loss=pose_loss,
+                    affinity_loss=affinity_loss,
                     stream=outstream,
                 )
 
     # TODO: Save input parameters as well
     to_save = {"model": model, "optimizer": optimizer}
+    # Requires no checkpoint in the output directory
+    # Since checkpoints are not automatically removed when restarting, it would be
+    # dangerous to run without requiring the directory to have no previous checkpoints
     checkpoint = Checkpoint(
         to_save,
         args.out_dir,

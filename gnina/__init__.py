@@ -1,4 +1,4 @@
-"""PyTorch implementation of GNINA"""
+"""PyTorch implementation of GNINA scoring function"""
 
 # Add imports here
 # from .gnina import *

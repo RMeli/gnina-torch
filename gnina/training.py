@@ -641,42 +641,6 @@ def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
     return m
 
 
-def _log_print(
-    title: str, epoch: int, metrics, output, pose_loss, affinity_loss, stream=sys.stdout
-):
-    """
-    Print metrics to the console.
-
-    Parameters
-    ----------
-    title: str
-        Title to print
-    epoch: int
-        Epoch number
-    metrics:
-        Dictionary of metrics
-    affinity: bool
-        Flag for binding affinity predictions
-    args: argparse.Namespace
-        Command line arg
-    """
-    print(f">>> {title} - Epoch[{epoch}] <<<", file=stream)
-
-    # TODO: Order metrics?
-    for name, value in metrics.items():
-        print(f"    {name}: {value:.5f}", file=stream)
-
-    # Print losses
-    loss = pose_loss(output["pose_log"], output["labels"])
-    print(f"    Loss (pose): {loss:.5f}", file=stream)
-    if affinity_loss is not None:
-        al = affinity_loss(output["affinities_pred"], output["affinities"])
-        print(f"    Loss (affinity): {al:.5f}", file=stream)
-
-        loss += al
-    print(f"    Loss: {loss:.5f}", file=stream, flush=True)
-
-
 def training(args):
     """
     Main function for training GNINA scoring function.
@@ -789,11 +753,11 @@ def training(args):
         evaluator.run(train_loader)
 
         for outstream in outstreams:
-            _log_print(
-                "Train Results",
-                trainer.state.epoch,
+            utils.log_print(
                 evaluator.state.metrics,
                 evaluator.state.output,
+                title="Train Results",
+                epoch=trainer.state.epoch,
                 pose_loss=pose_loss,
                 affinity_loss=affinity_loss,
                 stream=outstream,
@@ -834,11 +798,11 @@ def training(args):
             evaluator.run(test_loader)
 
             for outstream in outstreams:
-                _log_print(
-                    "Test Results",
-                    trainer.state.epoch,
+                utils.log_print(
                     evaluator.state.metrics,
                     evaluator.state.output,
+                    title="Test Results",
+                    epoch=trainer.state.epoch,
                     pose_loss=pose_loss,
                     affinity_loss=affinity_loss,
                     stream=outstream,

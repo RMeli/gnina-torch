@@ -178,6 +178,14 @@ def options(args: Optional[List[str]] = None):
     )
     parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
+    # ROC AUC fails when there is only one class (i.e. all poses are good poses)
+    # This happens when training with crystal structures only
+    parser.add_argument(
+        "--no_roc_auc",
+        action="store_false",
+        help="Disable ROC AUC (useful for crystal poses)",
+        dest="roc_auc",
+    )
 
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--silent", action="store_true", help="No console output")
@@ -353,7 +361,7 @@ def _train_step_pose_and_affinity(
 
 
 def _setup_trainer(
-    model, optimizer, device, pose_loss, affinity_loss, clip_gradients: float
+    model, optimizer, pose_loss, affinity_loss, clip_gradients: float
 ) -> Engine:
     """
     Setup training engine for binding pose prediction or binding pose and affinity
@@ -365,8 +373,6 @@ def _setup_trainer(
         Model to train
     optimizer:
         Optimizer
-    device: torch.device
-        Device
     pose_loss:
         Loss function for pose prediction
     affinity_loss:
@@ -616,7 +622,9 @@ def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
     return pose[:, -1], labels
 
 
-def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
+def _setup_metrics(
+    affinity: bool, roc_auc: bool, device
+) -> Dict[str, ignite.metrics.Metric]:
     """
     Define metrics to be computed at the end of an epoch (evaluation).
 
@@ -624,20 +632,27 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
     ----------
     affinity: bool
         Flag for binding affinity predictions
-    device: torch.device
-        Device
+    roc_auc: bool
+        Flag for computing ROC AUC
 
     Returns
     -------
     Dict[str, ignite.metrics.Metric]
         Dictionary of PyTorch Ignite metrics
+
+    Notes
+    -----
+    The computation of the ROC AUC for pose prediction can be disabled. This is useful
+    when the computation is expected to fail because all poses belong to the same class
+    (e.g. all poses are "good" poses). This situations happens when working with crystal
+    structures, for which the pose is a "good" pose by definition.
     """
 
     # Pose prediction metrics
     m = {
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "balanced_accuracy": metrics.Recall(
+        "balanced accuracy": metrics.Recall(
             average=True, output_transform=_output_transform_select_pose
         ),
         # Accuracy can be used directly without binarising the data since we are not
@@ -645,20 +660,23 @@ def _setup_metrics(affinity: bool, device) -> Dict[str, ignite.metrics.Metric]:
         # performing multiclass classification with 2 classes (Linear(out_features=2))
         "accuracy": metrics.Accuracy(output_transform=_output_transform_select_pose),
         # "classification": metrics.ClassificationReport(),
-        "roc_auc": ROC_AUC(
-            output_transform=lambda output: _output_transform_ROC(output),
-            device=device,
-        ),
     }
+
+    if roc_auc:
+        m.update(
+            {
+                "ROC AUC": ROC_AUC(
+                    output_transform=lambda output: _output_transform_ROC(output),
+                    device=device,
+                ),
+            }
+        )
 
     # Affinity prediction metrics
     if affinity:
         m.update(
             {
                 "MAE": metrics.MeanAbsoluteError(
-                    output_transform=_output_transform_select_affinity
-                ),
-                "MSE": metrics.MeanSquaredError(
                     output_transform=_output_transform_select_affinity
                 ),
                 "RMSE": metrics.RootMeanSquaredError(
@@ -692,25 +710,18 @@ def _log_print(
     """
     print(f">>> {title} - Epoch[{epoch}] <<<", file=stream)
 
-    # Pose classification metriccs
-    print(f"    Accuracy: {metrics['accuracy']:.2f}", file=stream)
-    print(f"    Balanced accuracy: {metrics['balanced_accuracy']:.2f}", file=stream)
-    print(f"    ROC AUC: {metrics['roc_auc']:.2f}", flush=True, file=stream)
+    # TODO: Order metrics?
+    for name, value in metrics.items():
+        print(f"    {name}: {value:.5f}", file=stream)
 
+    # Print losses
     loss = pose_loss(output["pose_log"], output["labels"])
     print(f"    Loss (pose): {loss:.5f}", file=stream)
-
-    # Binding affinity prediction metrics
     if affinity_loss is not None:
-        print(f"    MAE: {metrics['MAE']:.2f}", file=stream)
-        print(f"    MSE: {metrics['MSE']:.2f}", file=stream)
-        print(f"    RMSE: {metrics['RMSE']:.2f}", file=stream)
-
         al = affinity_loss(output["affinities_pred"], output["affinities"])
         print(f"    Loss (affinity): {al:.5f}", file=stream)
 
         loss += al
-
     print(f"    Loss: {loss:.5f}", file=stream)
 
 
@@ -733,6 +744,12 @@ def training(args):
     ----------
     args:
         Command line arguments
+
+    Notes
+    -----
+    Training might start off slow because the :code:`molgrid.ExampleProvider` is caching
+    the structures that are read from .gninatypes files. The training then speeds up
+    considerably.
     """
 
     # Create necessary directories if not already present
@@ -812,13 +829,12 @@ def training(args):
     trainer = _setup_trainer(
         model,
         optimizer,
-        device,
         pose_loss=pose_loss,
         affinity_loss=affinity_loss,
         clip_gradients=args.clip_gradients,
     )
 
-    allmetrics = _setup_metrics(affinity, device)
+    allmetrics = _setup_metrics(affinity, args.roc_auc, device)
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))

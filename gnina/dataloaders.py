@@ -66,8 +66,8 @@ class GriddedExamplesLoader:
         The number of examples per epoch depends on the :code:`molgrid.IterationScheme`
         used. Without balancing nor stratification, the number of examples per epoch is
         the same for :code:`molgrid.IterationScheme.SmalleEpoch` and
-        :code:`molgrid.IterationScheme.SmalleEpoch`. For balanced sampling, which sample
-        the sanem number of positive and negative examples, the number of examples in a
+        :code:`molgrid.IterationScheme.LargeEpoch`. For balanced sampling, which sample
+        the same number of positive and negative examples, the number of examples in a
         small epoch (examples seen at most once) is twice the size of the minority class
         while for a large epoch (examples seen at least once) it is twice the size of
         the majority class.

@@ -3,9 +3,20 @@ import torch.nn as nn
 from torch import Tensor
 
 
-class PseudoHuberLoss(nn.Module):
+class AffinityLoss(nn.Module):
     """
-    GNINA pseudo-Huber loss.
+    GNINA affinity loss.
+
+    Parameters
+    ----------
+    reduction: str
+        Reduction method (mean or sum)
+    delta: float
+        Scaling factor
+    penalty: float
+        Penalty factor
+    pseudo_huber: bool
+        Use pseudo-huber loss as opposed to L2 loss
 
     Notes
     -----
@@ -19,13 +30,18 @@ class PseudoHuberLoss(nn.Module):
     """
 
     def __init__(
-        self, reduction: str = "mean", delta: float = 1.0, penalty: float = 0.0
+        self,
+        reduction: str = "mean",
+        delta: float = 1.0,
+        penalty: float = 0.0,
+        pseudo_huber: bool = True,
     ):
         super().__init__()
 
         self.delta: float = delta
         self.delta2: float = delta * delta
         self.penalty: float = penalty
+        self.pseudo_huber: bool = pseudo_huber
 
         assert reduction in ["mean", "sum"]
         self.reduction: str = reduction
@@ -61,7 +77,10 @@ class PseudoHuberLoss(nn.Module):
 
         scaled_diff = diff / self.delta
 
-        loss = self.delta2 * (torch.sqrt(1.0 + scaled_diff * scaled_diff) - 1.0)
+        if self.pseudo_huber:
+            loss = self.delta2 * (torch.sqrt(1.0 + scaled_diff * scaled_diff) - 1.0)
+        else:
+            loss = scaled_diff * scaled_diff
 
         if self.reduction == "sum":
             return torch.sum(loss)

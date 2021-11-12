@@ -5,9 +5,8 @@ PyTorch implementation of GNINA scoring function's Caffe training script.
 import argparse
 import os
 import sys
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-import ignite
 import molgrid
 import numpy as np
 import torch
@@ -19,7 +18,7 @@ from ignite.handlers import Checkpoint
 from torch import nn, optim
 
 from gnina.dataloaders import GriddedExamplesLoader
-from gnina.losses import PseudoHuberLoss
+from gnina.losses import AffinityLoss
 from gnina.models import models_dict
 
 _iteration_schemes = {
@@ -161,6 +160,17 @@ def options(args: Optional[List[str]] = None):
         type=float,
         default=10.0,
         help="Gradients threshold (for clipping)",
+    )
+    parser.add_argument(
+        "--pseudo_huber_affinity_loss",
+        action="store_true",
+        help="Use pseudo-Huber loss for affinity loss",
+    )
+    parser.add_argument(
+        "--delta_affinity_loss",
+        type=float,
+        default=4.0,
+        help="Delta factor for affinity loss",
     )
 
     # Misc
@@ -622,9 +632,7 @@ def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
     return pose[:, -1], labels
 
 
-def _setup_metrics(
-    affinity: bool, roc_auc: bool, device
-) -> Dict[str, ignite.metrics.Metric]:
+def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
     """
     Define metrics to be computed at the end of an epoch (evaluation).
 
@@ -649,7 +657,7 @@ def _setup_metrics(
     """
 
     # Pose prediction metrics
-    m = {
+    m: Dict[str, Any] = {
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
         "balanced accuracy": metrics.Recall(
@@ -722,7 +730,7 @@ def _log_print(
         print(f"    Loss (affinity): {al:.5f}", file=stream)
 
         loss += al
-    print(f"    Loss: {loss:.5f}", file=stream)
+    print(f"    Loss: {loss:.5f}", file=stream, flush=True)
 
 
 def _print_args(args, header=None, stream=sys.stdout):
@@ -756,11 +764,11 @@ def training(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    outfile = open(os.path.join(args.out_dir, "training.log"), "w")
+    logfile = open(os.path.join(args.out_dir, "training.log"), "w")
     if not args.silent:
-        outstreams = [sys.stdout, outfile]
+        outstreams = [sys.stdout, logfile]
     else:
-        outstreams = [outfile]
+        outstreams = [logfile]
 
     # Print command line arguments
     for outstream in outstreams:
@@ -824,7 +832,13 @@ def training(args):
 
     # Define loss functions
     pose_loss = nn.NLLLoss()
-    affinity_loss = PseudoHuberLoss(delta=4.0) if affinity else None
+    affinity_loss = (
+        AffinityLoss(
+            delta=args.delta_affinity_loss, pseudo_huber=args.pseudo_huber_affinity_loss
+        )
+        if affinity
+        else None
+    )
 
     trainer = _setup_trainer(
         model,
@@ -898,6 +912,7 @@ def training(args):
                 )
 
     # TODO: Save input parameters as well
+    # TODO: Save best models (lower loss)
     to_save = {"model": model, "optimizer": optimizer}
     # Requires no checkpoint in the output directory
     # Since checkpoints are not automatically removed when restarting, it would be
@@ -919,8 +934,7 @@ def training(args):
     trainer.run(train_loader, max_epochs=args.iterations)
 
     # Close log file
-    # TODO: rename as logfile!
-    outfile.close()
+    logfile.close()
 
 
 if __name__ == "__main__":

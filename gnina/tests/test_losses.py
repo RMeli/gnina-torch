@@ -5,16 +5,16 @@ import torch
 from gnina import losses
 
 
-def test_pseudo_huber_loss_perfect_predictions(device):
-    criterion = losses.PseudoHuberLoss()
+def test_affinity_loss_perfect_predictions(device):
+    criterion = losses.AffinityLoss()
 
     target = torch.tensor([0.0, 1.1, 2.2, -3.3, -4.4])
 
     assert criterion(target, target).item() == pytest.approx(0.0)
 
 
-def test_pseudo_huber_loss_zero_affinity(device):
-    criterion = losses.PseudoHuberLoss()
+def test_affinity_loss_zero_affinity(device):
+    criterion = losses.AffinityLoss()
 
     target = torch.tensor([0.0, 1.1, 2.2, -3.3, -4.4])
 
@@ -24,8 +24,8 @@ def test_pseudo_huber_loss_zero_affinity(device):
     assert criterion(predicted, target).item() == pytest.approx(0.0)
 
 
-def test_pseudo_huber_loss_wrong_predicted_affinity_good_pose_sum(device):
-    criterion = losses.PseudoHuberLoss(reduction="sum")
+def test_affinity_loss_wrong_predicted_affinity_good_pose_sum(device):
+    criterion = losses.AffinityLoss(reduction="sum")
 
     diff = 0.1
 
@@ -39,8 +39,8 @@ def test_pseudo_huber_loss_wrong_predicted_affinity_good_pose_sum(device):
     )
 
 
-def test_pseudo_huber_loss_wrong_predicted_affinity_good_pose_mean(device):
-    criterion = losses.PseudoHuberLoss(reduction="mean")
+def test_affinity_loss_wrong_predicted_affinity_good_pose_mean(device):
+    criterion = losses.AffinityLoss(reduction="mean")
 
     diff = 0.1
 
@@ -55,8 +55,8 @@ def test_pseudo_huber_loss_wrong_predicted_affinity_good_pose_mean(device):
     assert criterion(predicted, target).item() == pytest.approx(expected_loss, abs=1e-6)
 
 
-def test_pseudo_huber_loss_overestimated_predicted_affinity_bad_pose_sum(device):
-    criterion = losses.PseudoHuberLoss(reduction="sum")
+def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum(device):
+    criterion = losses.AffinityLoss(reduction="sum")
 
     diff = 0.1
 
@@ -71,8 +71,8 @@ def test_pseudo_huber_loss_overestimated_predicted_affinity_bad_pose_sum(device)
     )
 
 
-def test_pseudo_huber_loss_underestimated_predicted_affinity_bad_pose_sum(device):
-    criterion = losses.PseudoHuberLoss(reduction="sum")
+def test_affinity_loss_underestimated_predicted_affinity_bad_pose_sum(device):
+    criterion = losses.AffinityLoss(reduction="sum")
 
     diff = 0.1
 

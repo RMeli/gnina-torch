@@ -384,7 +384,7 @@ class DenseBlock(nn.Module):
             Input tensor
         """
 
-        # TODO: Make more efficient by using keeping concatenated outputs
+        # TODO: Make more efficient by keeping concatenated outputs
 
         # Store output of previous layers
         # Used as input of next layer

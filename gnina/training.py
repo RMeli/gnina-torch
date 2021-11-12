@@ -17,6 +17,7 @@ from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint
 from torch import nn, optim
 
+from gnina import utils
 from gnina.dataloaders import GriddedExamplesLoader
 from gnina.losses import AffinityLoss
 from gnina.models import models_dict
@@ -733,17 +734,6 @@ def _log_print(
     print(f"    Loss: {loss:.5f}", file=stream, flush=True)
 
 
-def _print_args(args, header=None, stream=sys.stdout):
-    if header is not None:
-        print(header, file=stream)
-    for name, value in vars(args).items():
-        if type(value) is float:
-            print(f"{name}: {value:.5E}", file=stream)
-        else:
-            print(f"{name} = {value!r}", file=stream)
-    print("", file=stream, flush=True)
-
-
 def training(args):
     """
     Main function for training GNINA scoring function.
@@ -772,7 +762,7 @@ def training(args):
 
     # Print command line arguments
     for outstream in outstreams:
-        _print_args(args, "--- GNINA TRAINING ---", stream=outstream)
+        utils.print_args(args, "--- GNINA TRAINING ---", stream=outstream)
 
     # Set random seed for reproducibility
     if args.seed is not None:

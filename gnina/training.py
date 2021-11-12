@@ -17,15 +17,10 @@ from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint
 from torch import nn, optim
 
-from gnina import utils
+from gnina import setup, utils
 from gnina.dataloaders import GriddedExamplesLoader
 from gnina.losses import AffinityLoss
 from gnina.models import models_dict
-
-_iteration_schemes = {
-    "small": molgrid.IterationScheme.SmallEpoch,
-    "large": molgrid.IterationScheme.LargeEpoch,
-}
 
 
 def options(args: Optional[List[str]] = None):
@@ -134,7 +129,7 @@ def options(args: Optional[List[str]] = None):
         type=str,
         default="small",
         help="molgrid iteration sheme",
-        choices=_iteration_schemes.keys(),
+        choices=setup._iteration_schemes.keys(),
     )
     # lr_dynamic, originally called --dynamic
     parser.add_argument(
@@ -202,58 +197,6 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument("--silent", action="store_true", help="No console output")
 
     return parser.parse_args(args)
-
-
-def _setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
-    """
-    Setup :code:`molgrid.ExampleProvider` based on command line arguments.
-
-    Parameters
-    ----------
-    examples_file: str
-        File with examples (.types file)
-    args:
-        Command line arguments
-
-    Returns
-    -------
-    molgrid.ExampleProvider
-        Initialized :code:`molgrid.ExampleProvider`
-    """
-    example_provider = molgrid.ExampleProvider(
-        data_root=args.data_root,
-        balanced=args.balanced,
-        shuffle=args.shuffle,
-        default_batch_size=args.batch_size,
-        iteration_scheme=_iteration_schemes[args.iteration_scheme],
-        ligmolcache=args.ligmolcache,
-        recmolcache=args.recmolcache,
-        stratify_receptor=args.stratify_receptor,
-        cache_structs=True,
-    )
-    example_provider.populate(examples_file)
-
-    return example_provider
-
-
-def _setup_grid_maker(args) -> molgrid.GridMaker:
-    """
-    Setup :code:`molgrid.ExampleProvider` and :code:`molgrid.GridMaker` based on command
-    line arguments.
-
-    Parameters
-    ----------
-    args:
-        Command line arguments
-
-    Returns
-    -------
-    molgrid.GridMaker
-        Initialized :code:`molgrid.GridMaker`
-    """
-    grid_maker = molgrid.GridMaker(resolution=args.resolution, dimension=args.dimension)
-
-    return grid_maker
 
 
 def _train_step_pose(
@@ -774,12 +717,12 @@ def training(args):
     device = torch.device(args.gpu)
 
     # Create example providers
-    train_example_provider = _setup_example_provider(args.trainfile, args)
+    train_example_provider = setup.setup_example_provider(args.trainfile, args)
     if args.testfile is not None:
-        test_example_provider = _setup_example_provider(args.testfile, args)
+        test_example_provider = setup.setup_example_provider(args.testfile, args)
 
     # Create grid maker
-    grid_maker = _setup_grid_maker(args)
+    grid_maker = setup.setup_grid_maker(args)
 
     train_loader = GriddedExamplesLoader(
         example_provider=train_example_provider,

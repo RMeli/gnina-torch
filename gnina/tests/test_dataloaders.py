@@ -4,7 +4,7 @@ import sys
 import pytest
 import torch
 
-from gnina import training
+from gnina import setup, training
 from gnina.dataloaders import GriddedExamplesLoader
 
 
@@ -43,8 +43,8 @@ def test_GriddedExamplesLoader(trainfile, dataroot, device, iteration_scheme):
         ]
     )
 
-    e = training._setup_example_provider(args.trainfile, args)
-    gmaker = training._setup_grid_maker(args)
+    e = setup.setup_example_provider(args.trainfile, args)
+    gmaker = setup.setup_grid_maker(args)
 
     dataset = GriddedExamplesLoader(
         example_provider=e, grid_maker=gmaker, device=device
@@ -81,8 +81,8 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_1(
     args_small = training.options(
         [trainfile, "-d", dataroot, "--no_shuffle", "--balanced", "--batch_size", "1"]
     )
-    e_small = training._setup_example_provider(args_small.trainfile, args_small)
-    gmaker_small = training._setup_grid_maker(args_small)
+    e_small = setup.setup_example_provider(args_small.trainfile, args_small)
+    gmaker_small = setup.setup_grid_maker(args_small)
 
     dataset_small = GriddedExamplesLoader(
         example_provider=e_small,
@@ -105,8 +105,8 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_1(
             "large",
         ]
     )
-    e_large = training._setup_example_provider(args_large.trainfile, args_large)
-    gmaker_large = training._setup_grid_maker(args_large)
+    e_large = setup.setup_example_provider(args_large.trainfile, args_large)
+    gmaker_large = setup.setup_grid_maker(args_large)
 
     dataset_large = GriddedExamplesLoader(
         example_provider=e_large,
@@ -145,8 +145,8 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_2(
     args_small = training.options(
         [trainfile, "-d", dataroot, "--no_shuffle", "--balanced", "--batch_size", "2"]
     )
-    e_small = training._setup_example_provider(args_small.trainfile, args_small)
-    gmaker_small = training._setup_grid_maker(args_small)
+    e_small = setup.setup_example_provider(args_small.trainfile, args_small)
+    gmaker_small = setup.setup_grid_maker(args_small)
 
     dataset_small = GriddedExamplesLoader(
         example_provider=e_small,
@@ -169,8 +169,8 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_2(
             "large",
         ]
     )
-    e_large = training._setup_example_provider(args_large.trainfile, args_large)
-    gmaker_large = training._setup_grid_maker(args_large)
+    e_large = setup.setup_example_provider(args_large.trainfile, args_large)
+    gmaker_large = setup.setup_grid_maker(args_large)
 
     dataset_large = GriddedExamplesLoader(
         example_provider=e_large,
@@ -212,8 +212,8 @@ def test_GriddedExamplesLoader_batch_size(trainfile, dataroot, device):
         [trainfile, "-d", dataroot, "--no_shuffle", "--batch_size", "2"]
     )
 
-    e = training._setup_example_provider(args.trainfile, args)
-    gmaker = training._setup_grid_maker(args)
+    e = setup.setup_example_provider(args.trainfile, args)
+    gmaker = setup.setup_grid_maker(args)
 
     dataset = GriddedExamplesLoader(
         example_provider=e, grid_maker=gmaker, device=device

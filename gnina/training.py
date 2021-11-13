@@ -581,6 +581,39 @@ def _output_transform_select_affinity(
     return output["affinities_pred"], output["affinities"]
 
 
+def _output_transform_select_affinity_abs(
+    output: Dict[str, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Select predicted affinities output and experimental (target) affinities from output
+    dictionary.
+
+    Parameters
+    ----------
+    output: Dict[str, ignite.metrics.Metric]
+        Engine output
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        Predicted binding affnity and experimental binding affinity
+
+    Notes
+    -----
+    This function is used as :code:`output_transform` in
+    :class:`ignite.metrics.metric.Metric` and allow to select affinity predictions from
+    what the evaluator returns (that is,
+    :code:`(pose_log, affinities_pred, labels, affinities)` when :code:`affinity=True`).
+    See return of :fun:`_output_transform_pose_and_affinity`.
+
+    Affinities can have negative values when they are associated to bad poses. The sign
+    is used by :class:`AffinityLoss`, but in order to compute standard metrics the
+    absolute value is needed, which is returned here.
+    """
+    # Return pose class probabilities and true labels
+    return output["affinities_pred"], torch.abs(output["affinities"])
+
+
 def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Output transform for the ROC curve.
@@ -687,18 +720,22 @@ def _setup_metrics(
 
     # Affinity prediction metrics
     if affinity:
+        # Affinities have negative values for bad poses
+        # In order to compute metrics, the absolute value is returned
         m.update(
             {
                 "MAE": metrics.MeanAbsoluteError(
-                    output_transform=_output_transform_select_affinity
+                    output_transform=_output_transform_select_affinity_abs
                 ),
                 "RMSE": metrics.RootMeanSquaredError(
-                    output_transform=_output_transform_select_affinity
+                    output_transform=_output_transform_select_affinity_abs
                 ),
             }
         )
 
         if affinity_loss is not None:
+            # Affinities have negative values for bad poses
+            # The loss function uses the sign to distinguish good from bad poses
             m.update(
                 {
                     "Loss (affinity)": metrics.Loss(

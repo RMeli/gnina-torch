@@ -27,7 +27,7 @@ def print_args(
             print(f"{name} = {value!r}", file=stream)
 
     # Flush stream
-    print("", file=stream, flush=True)
+    print("", end="", file=stream, flush=True)
 
 
 def log_print(
@@ -65,4 +65,4 @@ def log_print(
 
     if loss > 0:
         print(f"    Loss: {loss:.5f}", file=stream)
-    print(flush=True)
+    print("", end="", file=stream, flush=True)

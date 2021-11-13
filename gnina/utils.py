@@ -34,7 +34,6 @@ def print_args(
 
 def log_print(
     metrics,
-    output=None,
     title: Optional[str] = None,
     epoch: Optional[int] = None,
     pose_loss: Optional[nn.Module] = None,
@@ -48,8 +47,6 @@ def log_print(
     ----------
     metrics:
         Dictionary of metrics
-    output:
-        Engine output
     title: str
         Title to print
     epoch: int
@@ -68,22 +65,12 @@ def log_print(
         indent = ""
 
     # TODO: Order metrics?
+    loss: float = 0.0
     for name, value in metrics.items():
         print(f"{indent}{name}: {value:.5f}", file=stream)
+        if "loss" in name.lower():
+            loss += value
 
-    if output is not None:
-        loss = 0
-        if pose_loss is not None:
-            pl = pose_loss(output["pose_log"], output["labels"])
-            print(f"{indent}Loss (pose): {pl:.5f}", file=stream)
-            loss += pl.item()
-
-        if affinity_loss is not None:
-            al = affinity_loss(output["affinities_pred"], output["affinities"])
-            print(f"{indent}Loss (affinity): {al:.5f}", file=stream)
-            loss += al.item()
-
-        if loss > 0:
-            print(f"    Loss: {loss:.5f}", file=stream)
-
+    if loss > 0:
+        print(f"    Loss: {loss:.5f}", file=stream)
     print(flush=True)

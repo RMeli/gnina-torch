@@ -498,10 +498,39 @@ def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
     return evaluator
 
 
+def _output_transform_select_log_pose(
+    output: Dict[str, torch.Tensor]
+) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Select pose :code:`log_softmax` output and labels from output dictionary.
+
+    Parameters
+    ----------
+    output: Dict[str, ignite.metrics.Metric]
+        Engine output
+
+    Notes
+    -----
+    This function is used as :code:`output_transform` in
+    :class:`ignite.metrics.metric.Metric` and allow to select pose results from
+    what the evaluator returns (that is,
+    :code:`(pose_log, affinities_pred, labels, affinities)` when :code:`affinity=True`).
+    See return of :fun:`_output_transform_pose_and_affinity`.
+
+    The output is not activated, i.e. the :code:`log_softmax` output is returned
+    unchanged
+    """
+    # Return pose class probabilities and true labels
+    # log_softmax is transformed into softmax to get the class probabilities
+    return output["pose_log"], output["labels"]
+
+
 def _output_transform_select_pose(
     output: Dict[str, torch.Tensor]
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
+    Select pose :code:`softmax` output and labels from output dictionary.
+
     Parameters
     ----------
     output: Dict[str, ignite.metrics.Metric]
@@ -527,6 +556,9 @@ def _output_transform_select_affinity(
     output: Dict[str, torch.Tensor]
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
+    Select predicted affinities output and experimental (target) affinities from output
+    dictionary.
+
     Parameters
     ----------
     output: Dict[str, ignite.metrics.Metric]
@@ -576,16 +608,22 @@ def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
     return pose[:, -1], labels
 
 
-def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
+def _setup_metrics(
+    pose_loss: nn.Module, affinity_loss: nn.Module, roc_auc: bool, device: torch.device
+) -> Dict[str, Any]:
     """
     Define metrics to be computed at the end of an epoch (evaluation).
 
     Parameters
     ----------
-    affinity: bool
-        Flag for binding affinity predictions
+    pose_loss: nn.Module
+        Pose loss
+    affinity_loss: nn.Module
+        Affinity loss
     roc_auc: bool
         Flag for computing ROC AUC
+    device: torch.device
+        Device
 
     Returns
     -------
@@ -598,21 +636,35 @@ def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
     when the computation is expected to fail because all poses belong to the same class
     (e.g. all poses are "good" poses). This situations happens when working with crystal
     structures, for which the pose is a "good" pose by definition.
+
+    Loss functions need to be set up as metrics in order to be correctly accumulated.
+    Using :code:`evaluator.state.output` to compute the loss does not work since the
+    output only contain the last batch (to avoid RAM saturation).
     """
 
     # Pose prediction metrics
     m: Dict[str, Any] = {
-        # Balanced accuracy is the average recall over all classes
-        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "balanced accuracy": metrics.Recall(
-            average=True, output_transform=_output_transform_select_pose
-        ),
         # Accuracy can be used directly without binarising the data since we are not
         # performing binary classification (Linear(out_features=1)) but we are
         # performing multiclass classification with 2 classes (Linear(out_features=2))
-        "accuracy": metrics.Accuracy(output_transform=_output_transform_select_pose),
-        # "classification": metrics.ClassificationReport(),
+        "Accuracy": metrics.Accuracy(output_transform=_output_transform_select_pose),
+        # Balanced accuracy is the average recall over all classes
+        # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
+        "Balanced accuracy": metrics.Recall(
+            average=True, output_transform=_output_transform_select_pose
+        ),
     }
+
+    if pose_loss is not None:
+        # For the loss function, log_softmax is needed as opposed to softmax
+        # Use _output_transform_select_log_pose instead of _output_transform_select_pose
+        m.update(
+            {
+                "Loss (pose)": metrics.Loss(
+                    pose_loss, output_transform=_output_transform_select_log_pose
+                )
+            }
+        )
 
     if roc_auc:
         m.update(
@@ -625,7 +677,7 @@ def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
         )
 
     # Affinity prediction metrics
-    if affinity:
+    if affinity_loss is not None:
         m.update(
             {
                 "MAE": metrics.MeanAbsoluteError(
@@ -633,6 +685,9 @@ def _setup_metrics(affinity: bool, roc_auc: bool, device) -> Dict[str, Any]:
                 ),
                 "RMSE": metrics.RootMeanSquaredError(
                     output_transform=_output_transform_select_affinity
+                ),
+                "Loss (affinity)": metrics.Loss(
+                    affinity_loss, output_transform=_output_transform_select_affinity
                 ),
             }
         )
@@ -749,7 +804,7 @@ def training(args):
         clip_gradients=args.clip_gradients,
     )
 
-    allmetrics = _setup_metrics(affinity, args.roc_auc, device)
+    allmetrics = _setup_metrics(pose_loss, affinity_loss, args.roc_auc, device)
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
@@ -759,7 +814,6 @@ def training(args):
         for outstream in outstreams:
             utils.log_print(
                 evaluator.state.metrics,
-                evaluator.state.output,
                 title="Train Results",
                 epoch=trainer.state.epoch,
                 pose_loss=pose_loss,
@@ -777,18 +831,19 @@ def training(args):
             verbose=False,
         )
 
+        # TODO: Define handle elsewhere and attach using input argumnets
         # TODO: Save lr history
         # Event.COMPLETED since we want the full evaluation to be completed
         @evaluator.on(Events.COMPLETED)
         def scheduler(evaluator):
-            output = evaluator.state.output
+            metrics = evaluator.state.metrics
 
-            with torch.no_grad():
-                loss = pose_loss(output["pose_log"], output["labels"])
-                if affinity:
-                    loss += affinity_loss(
-                        output["affinity_pred"], output["affinity_labels"]
-                    )
+            loss = metrics["Loss (pose)"]
+            try:
+                loss += metrics["Loss (affinity)"]
+            except KeyError:
+                # No affinity loss
+                pass
 
             torch_scheduler.step(loss)
 
@@ -804,7 +859,6 @@ def training(args):
             for outstream in outstreams:
                 utils.log_print(
                     evaluator.state.metrics,
-                    evaluator.state.output,
                     title="Test Results",
                     epoch=trainer.state.epoch,
                     pose_loss=pose_loss,

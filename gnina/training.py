@@ -681,9 +681,13 @@ def training(args):
     device = torch.device(args.gpu)
 
     # Create example providers
-    train_example_provider = setup.setup_example_provider(args.trainfile, args)
+    train_example_provider = setup.setup_example_provider(
+        args.trainfile, args, training=True
+    )
     if args.testfile is not None:
-        test_example_provider = setup.setup_example_provider(args.testfile, args)
+        test_example_provider = setup.setup_example_provider(
+            args.testfile, args, training=False
+        )
 
     # Create grid maker
     grid_maker = setup.setup_grid_maker(args)

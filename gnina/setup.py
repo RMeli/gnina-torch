@@ -2,6 +2,8 @@
 Utility functions to setup training and inference.
 """
 
+import argparse
+
 import molgrid
 
 # TODO: Ensure that for inference all systems are seen exactly once?
@@ -11,7 +13,9 @@ _iteration_schemes = {
 }
 
 
-def setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
+def setup_example_provider(
+    examples_file, args: argparse.Namespace, training: bool = True
+) -> molgrid.ExampleProvider:
     """
     Setup :code:`molgrid.ExampleProvider` based on command line arguments.
 
@@ -19,25 +23,48 @@ def setup_example_provider(examples_file, args) -> molgrid.ExampleProvider:
     ----------
     examples_file: str
         File with examples (.types file)
-    args:
+    args: argparse.Namespace
         Command line arguments
+    train: bool
+        Flag to distinguis between training and inference
 
     Returns
     -------
     molgrid.ExampleProvider
         Initialized :code:`molgrid.ExampleProvider`
+
+    Notes
+    -----
+    For inference (:code:`training=False`), the data set is not balanced, stratified,
+    nor shuffled.
     """
-    example_provider = molgrid.ExampleProvider(
-        data_root=args.data_root,
-        balanced=args.balanced,
-        shuffle=args.shuffle,
-        default_batch_size=args.batch_size,
-        iteration_scheme=_iteration_schemes[args.iteration_scheme],
-        ligmolcache=args.ligmolcache,
-        recmolcache=args.recmolcache,
-        stratify_receptor=args.stratify_receptor,
-        cache_structs=True,
-    )
+    if training:
+        # Use command line option for training
+        example_provider = molgrid.ExampleProvider(
+            data_root=args.data_root,
+            balanced=args.balanced,
+            shuffle=args.shuffle,
+            default_batch_size=args.batch_size,
+            iteration_scheme=_iteration_schemes[args.iteration_scheme],
+            ligmolcache=args.ligmolcache,
+            recmolcache=args.recmolcache,
+            stratify_receptor=args.stratify_receptor,
+            cache_structs=True,
+        )
+    else:
+        # Use command line option for training
+        example_provider = molgrid.ExampleProvider(
+            data_root=args.data_root,
+            balanced=False,
+            shuffle=False,
+            default_batch_size=args.batch_size,
+            iteration_scheme=_iteration_schemes["small"],
+            ligmolcache=args.ligmolcache,
+            recmolcache=args.recmolcache,
+            stratify_receptor=False,
+            cache_structs=True,
+        )
+
     example_provider.populate(examples_file)
 
     return example_provider

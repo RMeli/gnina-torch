@@ -609,13 +609,19 @@ def _output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
 
 
 def _setup_metrics(
-    pose_loss: nn.Module, affinity_loss: nn.Module, roc_auc: bool, device: torch.device
+    affinity: bool,
+    pose_loss: nn.Module,
+    affinity_loss: nn.Module,
+    roc_auc: bool,
+    device: torch.device,
 ) -> Dict[str, Any]:
     """
     Define metrics to be computed at the end of an epoch (evaluation).
 
     Parameters
     ----------
+    affinity: bool
+        Flag for affinity prediction (in addition to pose prediction)
     pose_loss: nn.Module
         Pose loss
     affinity_loss: nn.Module
@@ -641,6 +647,9 @@ def _setup_metrics(
     Using :code:`evaluator.state.output` to compute the loss does not work since the
     output only contain the last batch (to avoid RAM saturation).
     """
+    # Check that affinity_loss and affinity arguments are consistent
+    if affinity_loss is not None:
+        assert affinity
 
     # Pose prediction metrics
     m: Dict[str, Any] = {
@@ -677,7 +686,7 @@ def _setup_metrics(
         )
 
     # Affinity prediction metrics
-    if affinity_loss is not None:
+    if affinity:
         m.update(
             {
                 "MAE": metrics.MeanAbsoluteError(
@@ -686,11 +695,18 @@ def _setup_metrics(
                 "RMSE": metrics.RootMeanSquaredError(
                     output_transform=_output_transform_select_affinity
                 ),
-                "Loss (affinity)": metrics.Loss(
-                    affinity_loss, output_transform=_output_transform_select_affinity
-                ),
             }
         )
+
+        if affinity_loss is not None:
+            m.update(
+                {
+                    "Loss (affinity)": metrics.Loss(
+                        affinity_loss,
+                        output_transform=_output_transform_select_affinity,
+                    )
+                }
+            )
 
     # Return dictionary with all metrics
     return m
@@ -804,7 +820,9 @@ def training(args):
         clip_gradients=args.clip_gradients,
     )
 
-    allmetrics = _setup_metrics(pose_loss, affinity_loss, args.roc_auc, device)
+    allmetrics = _setup_metrics(
+        affinity, pose_loss, affinity_loss, args.roc_auc, device
+    )
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
@@ -816,8 +834,6 @@ def training(args):
                 evaluator.state.metrics,
                 title="Train Results",
                 epoch=trainer.state.epoch,
-                pose_loss=pose_loss,
-                affinity_loss=affinity_loss,
                 stream=outstream,
             )
 
@@ -861,8 +877,6 @@ def training(args):
                     evaluator.state.metrics,
                     title="Test Results",
                     epoch=trainer.state.epoch,
-                    pose_loss=pose_loss,
-                    affinity_loss=affinity_loss,
                     stream=outstream,
                 )
 

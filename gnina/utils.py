@@ -2,8 +2,6 @@ import argparse
 import sys
 from typing import Optional
 
-from torch import nn
-
 
 def print_args(
     args: argparse.Namespace, header: Optional[str] = None, stream=sys.stdout
@@ -36,8 +34,6 @@ def log_print(
     metrics,
     title: Optional[str] = None,
     epoch: Optional[int] = None,
-    pose_loss: Optional[nn.Module] = None,
-    affinity_loss: Optional[nn.Module] = None,
     stream=sys.stdout,
 ):
     """
@@ -51,10 +47,6 @@ def log_print(
         Title to print
     epoch: int
         Epoch number
-    pose_loss: nn.Module
-        Pose loss
-    affinity_loss: nn.Module
-        Affinity loss
     stream:
         Outoput stream
     """

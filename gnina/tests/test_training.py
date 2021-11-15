@@ -145,7 +145,7 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
             "--batch_size",
             "1",
             "--test_every",
-            "2",
+            "1",
             "--iterations",
             "5",
             "-o",

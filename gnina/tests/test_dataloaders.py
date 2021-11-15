@@ -50,20 +50,85 @@ def test_GriddedExamplesLoader(trainfile, dataroot, device, iteration_scheme):
         example_provider=e, grid_maker=gmaker, device=device
     )
 
-    assert dataset.num_examples == 3
+    assert dataset.num_examples_tot == 3
     assert dataset.num_labels == 3
 
     # Without balancing the length of the dataset is the same as the number of examples
     # This is true for both small and large epochs
-    assert len(dataset) == 3
+    assert dataset.example_provider.small_epoch_size() == 3
+    assert dataset.example_provider.large_epoch_size() == 3
 
-    for _ in range(len(dataset)):
+    for _ in range(10):  # Simulate epochs
+        # Simulate batches
+        # Expect three batches all of the same size
+        for _ in range(3):
+            grids, labels = next(dataset)
+            assert grids.shape == (1, 28, 48, 48, 48)
+            assert labels.shape == (1,)
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset)
+
+        # Restart iterator
+        dataset = iter(dataset)
+
+
+@pytest.mark.parametrize("iteration_scheme", ["small", "large"])
+def test_GriddedExamplesLoader_batch_size_2l(
+    trainfile, dataroot, device, iteration_scheme
+):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "2",
+            "--iteration_scheme",
+            iteration_scheme,
+        ]
+    )
+
+    e = setup.setup_example_provider(args.trainfile, args)
+    gmaker = setup.setup_grid_maker(args)
+
+    dataset = GriddedExamplesLoader(
+        example_provider=e, grid_maker=gmaker, device=device
+    )
+
+    assert dataset.num_examples_tot == 3
+    assert dataset.num_labels == 3
+
+    # Without balancing the length of the dataset is the same as the number of examples
+    # This is true for both small and large epochs
+    assert dataset.example_provider.small_epoch_size() == dataset.num_examples_tot
+    assert dataset.example_provider.large_epoch_size() == dataset.num_examples_tot
+    assert dataset.num_examples_per_epoch == dataset.num_examples_tot
+
+    assert dataset.num_batches == 2
+    assert dataset.last_batch_size == 1
+
+    for epoch in range(10):  # Simulate epochs
+        # First batch
+        grids, labels = next(dataset)
+        assert grids.shape == (2, 28, 48, 48, 48)
+        assert labels.shape == (2,)
+
+        # Second batch; this batch only contains one example
         grids, labels = next(dataset)
         assert grids.shape == (1, 28, 48, 48, 48)
         assert labels.shape == (1,)
 
-    with pytest.raises(StopIteration):
-        next(dataset)
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset)
+
+        # Restart iterator
+        dataset = iter(dataset)
 
 
 def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_1(
@@ -84,11 +149,12 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_1(
     e_small = setup.setup_example_provider(args_small.trainfile, args_small)
     gmaker_small = setup.setup_grid_maker(args_small)
 
-    dataset_small = GriddedExamplesLoader(
-        example_provider=e_small,
-        grid_maker=gmaker_small,
-        device=device,
-    )
+    with pytest.raises(ValueError):
+        GriddedExamplesLoader(
+            example_provider=e_small,
+            grid_maker=gmaker_small,
+            device=device,
+        )
 
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
@@ -108,33 +174,12 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_1(
     e_large = setup.setup_example_provider(args_large.trainfile, args_large)
     gmaker_large = setup.setup_grid_maker(args_large)
 
-    dataset_large = GriddedExamplesLoader(
-        example_provider=e_large,
-        grid_maker=gmaker_large,
-        device=device,
-    )
-
-    # Dataset test.types contains one positive example and two negative examples
-    # Balancing (minority class oversampling) results in different epoch sizes
-    assert len(dataset_small) == 2  # Twice the minority class
-    assert len(dataset_large) == 4  # Twice the majority class
-
-    # With a batch_size of 1, only one batch can be loaded in a small epoch since there
-    # is only one example in the minority class
-    grids, labels = next(dataset_small)
-    assert grids.shape == (1, 28, 48, 48, 48)
-    assert labels.shape == (1,)
-    with pytest.raises(StopIteration):
-        next(dataset_small)
-
-    # With a batch_size of 1, three batches can be loaded in a large epoch since there
-    # are two examples in the manjority class
-    for _ in range(3):
-        grids, labels = next(dataset_large)
-        assert grids.shape == (1, 28, 48, 48, 48)
-        assert labels.shape == (1,)
-    with pytest.raises(StopIteration):
-        next(dataset_large)
+    with pytest.raises(ValueError):
+        GriddedExamplesLoader(
+            example_provider=e_large,
+            grid_maker=gmaker_large,
+            device=device,
+        )
 
 
 def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_2(
@@ -153,6 +198,32 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_2(
         grid_maker=gmaker_small,
         device=device,
     )
+
+    # Dataset test.types contains one positive example and two negative examples
+    # Balancing (minority class oversampling) results in different epoch sizes
+    assert dataset_small.num_examples_tot == 3
+    assert dataset_small.num_labels == 3
+    assert dataset_small.num_examples_per_epoch == 2  # Twice the minority class
+    assert dataset_small.num_batches == 1
+    assert dataset_small.last_batch_size == 0
+
+    # With a batch_size of 2, only one batch can be loaded in a small epoch since there
+    # is only one example in the minority class
+    for _ in range(10):  # Simulate epochs
+        # Load the only batch
+        grids, labels = next(dataset_small)
+        assert grids.shape == (2, 28, 48, 48, 48)
+        assert labels.shape == (2,)
+
+        # The positive example is sampled once, with one of the negative examples
+        assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_small)
+
+        # Restart iterator
+        dataset_small = iter(dataset_small)
 
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
@@ -180,36 +251,49 @@ def test_GriddedExamplesLoader_iteration_scheme_balanced_batch_size_2(
 
     # Dataset test.types contains one positive example and two negative examples
     # Balancing (minority class oversampling) results in different epoch sizes
-    assert len(dataset_small) == 2  # Twice the minority class
-    assert len(dataset_large) == 4  # Twice the majority class
-
-    # With a batch_size of 2, only one batch can be loaded in a small epoch since there
-    # is only one example in the minority class
-    grids, labels = next(dataset_small)
-    assert grids.shape == (2, 28, 48, 48, 48)
-    assert labels.shape == (2,)
-    # The positive example is sampled once, with one of the negative examples
-    assert torch.allclose(labels, torch.tensor([1, 0], device=device))
-    with pytest.raises(StopIteration):
-        next(dataset_small)
+    assert dataset_large.num_examples_tot == 3
+    assert dataset_large.num_labels == 3
+    assert dataset_large.num_examples_per_epoch == 4  # Twice the majority class
+    assert dataset_large.num_batches == 2
+    assert dataset_large.last_batch_size == 0
 
     # With a batch_size of 2, only two batches can be loaded in a large epoch since
     # there are two examples in the manjority class
-    for _ in range(2):
-        grids, labels = next(dataset_large)
-        assert grids.shape == (2, 28, 48, 48, 48)
-        assert labels.shape == (2,)
-        # The positive example is sampled twice, one for each of the negative examples
-        assert torch.allclose(labels, torch.tensor([1, 0], device=device))
-    with pytest.raises(StopIteration):
-        next(dataset_large)
+    for _ in range(10):  # Simulate epochs
+        # Load two batches
+        for _ in range(2):
+            grids, labels = next(dataset_large)
+            assert grids.shape == (2, 28, 48, 48, 48)
+            assert labels.shape == (2,)
+
+            # The positive example is sampled twice, one for each of the negative examples
+            assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_large)
+
+        # Restart iterator
+        dataset_large = iter(dataset_large)
 
 
-def test_GriddedExamplesLoader_batch_size(trainfile, dataroot, device):
+@pytest.mark.parametrize("iteration_scheme", ["small", "large"])
+def test_GriddedExamplesLoader_batch_size_2_no_balancing(
+    trainfile, dataroot, device, iteration_scheme
+):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
-        [trainfile, "-d", dataroot, "--no_shuffle", "--batch_size", "2"]
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "2",
+            "--iteration_scheme",
+            iteration_scheme,
+        ]
     )
 
     e = setup.setup_example_provider(args.trainfile, args)
@@ -219,16 +303,29 @@ def test_GriddedExamplesLoader_batch_size(trainfile, dataroot, device):
         example_provider=e, grid_maker=gmaker, device=device
     )
 
+    assert dataset.num_examples_tot == 3
+    assert dataset.num_examples_per_epoch == 3
     assert dataset.num_labels == 3
+    assert dataset.num_batches == 2
+    assert dataset.last_batch_size == 1
 
-    grids, labels = next(dataset)
-    assert grids.shape == (2, 28, 48, 48, 48)
-    assert labels.shape == (2,)
-    assert torch.allclose(labels, torch.tensor([0, 1], device=device))
+    for _ in range(10):  # Simulate epochs
 
-    grids, labels = next(dataset)
-    assert grids.shape == (2, 28, 48, 48, 48)
-    assert labels.shape == (2,)
-    # Last batch padded with examples from the next epoch
-    #   https://gnina.github.io/libmolgrid/python/index.html#molgrid.ExampleProviderSettings.iteration_scheme
-    assert torch.allclose(labels, torch.tensor([0, 0], device=device))
+        # Load first batch with two examples
+        grids, labels = next(dataset)
+        assert grids.shape == (2, 28, 48, 48, 48)
+        assert labels.shape == (2,)
+        assert torch.allclose(labels, torch.tensor([0, 1], device=device))
+
+        # Load second (last) batch with only one example
+        grids, labels = next(dataset)
+        assert grids.shape == (1, 28, 48, 48, 48)
+        assert labels.shape == (1,)
+        assert torch.allclose(labels, torch.tensor([0], device=device))
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset)
+
+        # Restart iterator
+        dataset = iter(dataset)

@@ -547,6 +547,7 @@ def _output_transform_select_pose(
     The output is activated, i.e. the :code:`log_softmax` output is transformed into
     :code:`softmax`.
     """
+    # print("DEBUG:", output)
     # Return pose class probabilities and true labels
     # log_softmax is transformed into softmax to get the class probabilities
     return torch.exp(output["pose_log"]), output["labels"]
@@ -900,7 +901,7 @@ def training(args):
             torch_scheduler.step(loss)
 
             assert len(optimizer.param_groups) == 1
-            print(f"Learning rate: {optimizer.param_groups[0]['lr']}")
+            print(f"    Learning rate: {optimizer.param_groups[0]['lr']}")
 
     if args.testfile is not None:
 

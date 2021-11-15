@@ -2,7 +2,7 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-for variable in ["loss", "ROC-AUC"]:
+for variable in ["loss", "rmse"]:
     plt.figure()
 
     df = pd.read_csv(
@@ -25,3 +25,8 @@ for variable in ["loss", "ROC-AUC"]:
         dashes=False,
     )
     plt.savefig(f"results/{variable}.png")
+
+df = pd.read_csv("out/inference.csv")
+plt.figure()
+sns.regplot(data=df, x="affinity_exp", y="affinity_pred")
+plt.savefig("results/inference.png")

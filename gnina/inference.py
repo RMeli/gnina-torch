@@ -197,8 +197,10 @@ def inference(args):
             results["affinity_pred"] = np.concatenate(
                 (results["affinity_pred"], output["affinities_pred"].cpu().numpy())
             )
+            # Return absolute binding affinity
+            # Experimental values are negative for a bad pose
             results["affinity_exp"] = np.concatenate(
-                (results["affinity_exp"], output["affinities"].cpu().numpy())
+                (results["affinity_exp"], np.abs(output["affinities"].cpu().numpy()))
             )
         except KeyError:
             # No binding affinity prediction available

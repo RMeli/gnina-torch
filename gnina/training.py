@@ -828,9 +828,8 @@ def training(args):
     # Create model
     model = models_dict[args.model](train_loader.dims, affinity=affinity).to(device)
 
-    # Compile model into TorchScript
-    # FIXME: Does not work because of different return types between pose and affinity
-    # model = torch.jit.script(model)
+    # TODO: Compile model into TorchScript
+    # Requires model refactoring to avoid branching based on affinity
 
     optimizer = optim.SGD(
         model.parameters(),

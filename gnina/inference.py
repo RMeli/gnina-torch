@@ -1,10 +1,12 @@
 import argparse
 import os
 import sys
+from collections import defaultdict
 from typing import List, Optional
 
 import molgrid
 import numpy as np
+import pandas as pd
 import torch
 from ignite.engine import Events
 from ignite.handlers import Checkpoint
@@ -86,6 +88,12 @@ def options(args: Optional[List[str]] = None):
         help="Disable ROC AUC (useful for crystal poses)",
         dest="roc_auc",
     )
+    parser.add_argument(
+        "--no_csv",
+        action="store_false",
+        help="Disable CSV output",
+        dest="csv",
+    )
 
     return parser.parse_args(args)
 
@@ -162,6 +170,8 @@ def inference(args):
     )
     evaluator = training._setup_evaluator(model, allmetrics, affinity=affinity)
 
+    results = defaultdict(list)
+
     # Print predictions for every batch
     # evaluator.state.output only stores the last batch
     @evaluator.on(Events.ITERATION_COMPLETED)
@@ -170,26 +180,29 @@ def inference(args):
 
         # Extract probability of good pose only
         pose_pred = torch.exp(output["pose_log"])[:, -1]
-
         assert pose_pred.shape == output["labels"].shape
-        for p, label in zip(pose_pred, output["labels"]):
-            for oustream in outstreams:
-                print(f"{p.item():.5f} {label.item()}", end=" ", file=oustream)
+
+        results["pose_prob"] = np.concatenate(
+            (results["pose_prob"], pose_pred.cpu().numpy())
+        )
+        results["pose_label"] = np.concatenate(
+            (results["pose_label"], output["labels"].cpu().numpy())
+        )
 
         try:
+            # This fails with KeyError if affinity is not present
             assert output["affinities_pred"].shape == output["affinities"].shape
-            for a_pred, a_exp in zip(output["affinities_pred"], output["affinities"]):
-                for oustream in outstreams:
-                    print(
-                        f"{a_pred.item():.5f} {a_exp.item():.5f}",
-                        end="",
-                        file=outstream,
-                    )
-        except KeyError:
-            # No binding affinity prediction
-            pass
+            assert output["affinities_pred"].shape == output["labels"].shape
 
-        print("", flush=True)
+            results["affinity_pred"] = np.concatenate(
+                (results["affinity_pred"], output["affinities_pred"].cpu().numpy())
+            )
+            results["affinity_exp"] = np.concatenate(
+                (results["affinity_exp"], output["affinities"].cpu().numpy())
+            )
+        except KeyError:
+            # No binding affinity prediction available
+            pass
 
     evaluator.run(test_loader)
 
@@ -198,6 +211,11 @@ def inference(args):
             evaluator.state.metrics,
             stream=outstream,
         )
+
+    df = pd.DataFrame(results)
+
+    if args.csv:
+        df.to_csv(os.path.join(args.out_dir, "inference.csv"), float_format="%.5f")
 
     # Close log file
     logfile.close()

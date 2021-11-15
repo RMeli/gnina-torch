@@ -2,8 +2,6 @@ import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
 
-epochs = 50
-
 df_all = pd.DataFrame(columns=["Fold", "ROC-AUC", "Phase", "Augmentation"])
 
 for a in ["augmentation", "no-augmentation"]:
@@ -11,7 +9,6 @@ for a in ["augmentation", "no-augmentation"]:
         df = pd.read_csv(f"results/{a}-{p}.csv", header=None).rename(
             columns={0: "Epoch"}
         )
-        print(df)
 
         df["Phase"] = p
         df["Augmentation"] = "yes" if a == "augmentation" else "no"

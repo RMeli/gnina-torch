@@ -9,6 +9,8 @@
 # | Fig. 3.                                                                            |
 # + ---------------------------------------------------------------------------------- +
 
+epochs=250
+
 # Training on CSAR data with data augmentation
 for i in 0 1 2
 do
@@ -20,10 +22,10 @@ do
         models-master/data/csar/alltrain${i}.types \
         --testfile models-master/data/csar/alltest${i}.types \
         --data_root models-master/data/csar/ \
-        --iterations 50 \
+        --iterations ${epochs} \
         --batch_size 10 \
         --balanced \
-        --test_every 1 \
+        --test_every 2 \
         --checkpoint_every 1 \
         --num_checkpoints 1 \
         --out_dir ${outdir} \
@@ -41,12 +43,12 @@ do
         models-master/data/csar/alltrain${i}.types \
         --testfile models-master/data/csar/alltest${i}.types \
         --data_root models-master/data/csar/ \
-        --iterations 50 \
+        --iterations ${epochs} \
         --batch_size 10 \
         --balanced \
         --random_translation 0.0 \
         --no_random_rotation \
-        --test_every 1 \
+        --test_every 2 \
         --checkpoint_every 1 \
         --num_checkpoints 1 \
         --out_dir ${outdir} \

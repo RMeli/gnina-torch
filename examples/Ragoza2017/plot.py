@@ -26,5 +26,5 @@ for a in ["augmentation", "no-augmentation"]:
 sns.lineplot(
     x="Epoch", y="ROC-AUC", hue="Augmentation", style="Phase", data=df_all, markers=True
 )
-plt.savefig("ROC-AUC.png")
-plt.savefig("ROC-AUC.pdf")
+plt.savefig("results/ROC-AUC.png")
+plt.savefig("results/ROC-AUC.pdf")

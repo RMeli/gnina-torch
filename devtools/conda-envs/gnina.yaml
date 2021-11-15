@@ -9,6 +9,10 @@ dependencies:
   - pip
   - ipython
 
+  - numpy
+  - scipy
+  - pandas
+
   - pytorch=1.9
   - ignite
   - torchvision

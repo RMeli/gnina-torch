@@ -1,3 +1,4 @@
+import molgrid
 import pytest
 import torch
 
@@ -25,7 +26,11 @@ def device(pytestconfig):
     gpu = pytestconfig.getoption("--nogpu")
 
     if gpu:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device_index = 0
+        device = torch.device(
+            f"cuda:{device_index}" if torch.cuda.is_available() else "cpu"
+        )
+        molgrid.set_gpu_device(device_index)
     else:
         device = torch.device("cpu")
 

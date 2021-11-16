@@ -2,6 +2,9 @@ import argparse
 import sys
 from typing import Optional
 
+import molgrid
+import torch
+
 
 def print_args(
     args: argparse.Namespace, header: Optional[str] = None, stream=sys.stdout
@@ -66,3 +69,37 @@ def log_print(
     if loss > 0:
         print(f"    Loss: {loss:.5f}", file=stream)
     print("", end="", file=stream, flush=True)
+
+
+def set_device(device_name: str) -> torch.device:
+    """
+    Set the device to use.
+
+    Parameters
+    ----------
+    device_name: str
+        Name of the device to use (:code:`"cpu"`, :code:`"cuda"`, :code:`"cuda:0"`, ...)
+
+    Returns
+    -------
+    torch.device
+        PyTorch device
+
+    Notes
+    -----
+    This function also set the global device for :code:`molgrid` so that the
+    :code:`molgrid.ExampoleProvider` works on the correct device.
+
+    https://github.com/gnina/libmolgrid/issues/43
+    """
+    # TODO: Set global PyTorch device?
+
+    device = torch.device(device_name)
+    if "cuda" in device_name:
+        try:  # cuda:IDX
+            molgrid.set_gpu_device(int(device_name[-1]))
+        except ValueError:  # cuda
+            # Set device 0 by default
+            molgrid.set_gpu_device(0)
+
+    return device

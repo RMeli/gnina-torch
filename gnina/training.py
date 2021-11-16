@@ -787,7 +787,7 @@ def training(args):
         np.random.seed(args.seed)
 
     # Set device
-    device = torch.device(args.gpu)
+    device = utils.set_device(args.gpu)
 
     # Create example providers
     train_example_provider = setup.setup_example_provider(

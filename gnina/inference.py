@@ -128,7 +128,7 @@ def inference(args):
         np.random.seed(args.seed)
 
     # Set device
-    device = torch.device(args.gpu)
+    device = utils.set_device(args.gpu)
 
     # Create example providers
     test_example_provider = setup.setup_example_provider(
@@ -156,7 +156,7 @@ def inference(args):
     )
 
     # Load checkpoint
-    checkpoint = torch.load(args.checkpoint)
+    checkpoint = torch.load(args.checkpoint, map_location=device)
     Checkpoint.load_objects(to_load={"model": model}, checkpoint=checkpoint)
 
     # TODO: Allow prediction for systems without known pose or affinity

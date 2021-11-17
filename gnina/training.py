@@ -93,7 +93,7 @@ def options(args: Optional[List[str]] = None):
         type=str,
         default="default2017",
         help="Model name",
-        choices=models_dict.keys(),
+        choices=[k[0] for k in models_dict.keys()],  # Model names
     )
     parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
     parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
@@ -538,7 +538,7 @@ def _output_transform_select_pose(
 
     Notes
     -----
-    THis function is used as :code:`output_transform` in
+    This function is used as :code:`output_transform` in
     :class:`ignite.metrics.metric.Metric` and allow to select pose results from
     what the evaluator returns (that is,
     :code:`(pose_log, affinities_pred, labels, affinities)` when :code:`affinity=True`).
@@ -827,7 +827,8 @@ def training(args):
     affinity: bool = True if args.affinity_pos is not None else False
 
     # Create model
-    model = models_dict[args.model](train_loader.dims, affinity=affinity).to(device)
+    # Select model based on architecture and affinity flag (pose vs affinity)
+    model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
 
     # TODO: Compile model into TorchScript
     # Requires model refactoring to avoid branching based on affinity

@@ -29,24 +29,21 @@ class Default2017(nn.Module):
     ----------
     input_dims: tuple
         Model input dimensions (channels, depth, height, width)
-    affinity: bool
-        Enable affinity prediction (alongside pose prediction)
 
     Notes
     -----
-    This architectre was translated from the following Caffe model:
+    This architecture was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2017.model
 
-    The main difference is that the PyTorech implementation resurns the log softmax.
+    The main difference is that the PyTorch implementation resurns the log softmax.
     """
 
-    def __init__(self, input_dims: Tuple, affinity: bool = True):
+    def __init__(self, input_dims: Tuple):
 
         super().__init__()
 
         self.input_dims = input_dims
-        self.predict_affinity = affinity
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -98,6 +95,34 @@ class Default2017(nn.Module):
             input_dims[1] // 8 * input_dims[2] // 8 * input_dims[3] // 8 * 128
         )
 
+    def forward(self, x: torch.Tensor):
+        raise NotImplementedError
+
+
+class Default2017Pose(Default2017):
+    """
+    GNINA default2017 model architecture for pose prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architecture was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/default2017.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax of
+    the final linear layer instead of feeding it to a :code:`SoftmaxWithLoss` layer.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for pose prediction
         self.pose = nn.Sequential(
             OrderedDict(
                 [
@@ -108,20 +133,6 @@ class Default2017(nn.Module):
                 ]
             )
         )
-
-        if self.predict_affinity:
-            self.affinity = nn.Sequential(
-                OrderedDict(
-                    [
-                        (
-                            "affinity_output",
-                            nn.Linear(
-                                in_features=self.features_out_size, out_features=1
-                            ),
-                        )
-                    ]
-                )
-            )
 
         # Xavier initialization for convolutional and linear layers
         for m in self.modules():
@@ -148,13 +159,73 @@ class Default2017(nn.Module):
         pose_raw = self.pose(x)
         pose_log = F.log_softmax(pose_raw, dim=1)
 
-        if self.predict_affinity:
-            affinity = self.affinity(x)
-            # Squeeze last (dummy) dimension of affinity prediction
-            # This allows to match the shape (batch_size,) of the target tensor
-            return pose_log, affinity.squeeze(-1)
-        else:
-            return pose_log
+        return pose_log
+
+
+class Default2017Affinity(Default2017Pose):
+    """
+    GNINA default2017 model architecture for pose and affinity prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architecture was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/default2017.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax of
+    the final linear layer instead of feeding it to a :code:`SoftmaxWithLoss` layer.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for binding affinity prediction
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
+            )
+        )
+
+        # Xavier initialization for convolutional and linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight.data)
+                # TODO: Initialize bias to zero?
+                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+
+        x = self.features(x)
+        x = x.view(-1, self.features_out_size)
+
+        pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        affinity = self.affinity(x)
+        # Squeeze last (dummy) dimension of affinity prediction
+        # This allows to match the shape (batch_size,) of the target tensor
+        return pose_log, affinity.squeeze(-1)
 
 
 class Default2018(nn.Module):
@@ -165,24 +236,19 @@ class Default2018(nn.Module):
     ----------
     input_dims: tuple
         Model input dimensions (channels, depth, height, width)
-    affinity: bool
-        Enable affinity prediction (alongside pose prediction)
 
     Notes
     -----
-    This architectre was translated from the following Caffe model:
+    This architecture was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
 
-    The main difference is that the PyTorech implementation resurns the log softmax.
+    The main difference is that the PyTorch implementation resurns the log softmax.
     """
 
-    def __init__(self, input_dims: Tuple, affinity: bool = True):
+    def __init__(self, input_dims: Tuple):
 
         super().__init__()
-
-        self.input_dims = input_dims
-        self.predict_affinity = affinity
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -258,6 +324,39 @@ class Default2018(nn.Module):
             input_dims[1] // 8 * input_dims[2] // 8 * input_dims[3] // 8 * 128
         )
 
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+        """
+        raise NotImplementedError
+
+
+class Default2018Pose(Default2018):
+    """
+    GNINA default2017 model architecture for pose prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architectre was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for pose prediction
         self.pose = nn.Sequential(
             OrderedDict(
                 [
@@ -269,24 +368,12 @@ class Default2018(nn.Module):
             )
         )
 
-        if self.predict_affinity:
-            self.affinity = nn.Sequential(
-                OrderedDict(
-                    [
-                        (
-                            "affinity_output",
-                            nn.Linear(
-                                in_features=self.features_out_size, out_features=1
-                            ),
-                        )
-                    ]
-                )
-            )
-
         # Xavier initialization for convolutional and linear layers
         for m in self.modules():
             if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
                 nn.init.xavier_uniform_(m.weight.data)
+                # TODO: Initialize bias to zero?
+                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -306,13 +393,72 @@ class Default2018(nn.Module):
         pose_raw = self.pose(x)
         pose_log = F.log_softmax(pose_raw, dim=1)
 
-        if self.predict_affinity:
-            affinity = self.affinity(x)
-            # Squeeze last (dummy) dimension of affinity prediction
-            # This allows to match the shape (batch_size,) of the target tensor
-            return pose_log, affinity.squeeze(-1)
-        else:
-            return pose_log
+        return pose_log
+
+
+class Default2018Affinity(Default2018Pose):
+    """
+    GNINA default2017 model architecture for pose and affinity prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architecture was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for binding affinity prediction
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
+            )
+        )
+
+        # Xavier initialization for convolutional and linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight.data)
+                # TODO: Initialize bias to zero?
+                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+
+        x = self.features(x)
+        x = x.view(-1, self.features_out_size)
+
+        pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        affinity = self.affinity(x)
+        # Squeeze last (dummy) dimension of affinity prediction
+        # This allows to match the shape (batch_size,) of the target tensor
+        return pose_log, affinity.squeeze(-1)
 
 
 class DenseBlock(nn.Module):
@@ -332,7 +478,7 @@ class DenseBlock(nn.Module):
 
     Notes
     -----
-    The total number of output features corresponds tothe input features concatenated
+    The total number of output features corresponds to the input features concatenated
     together with all subsequent :code:`num_block_features` produced by the
     convolutional layers (:code:`num_block_convs` times).
     """
@@ -413,7 +559,7 @@ class Dense(nn.Module):
     input_dims: tuple
         Model input dimensions (channels, depth, height, width)
     num_blocks: int
-        Numbr of dense blocks
+        Number of dense blocks
     num_block_features: int
         Number of features in dense block convolutions
     num_block_convs" int
@@ -511,6 +657,58 @@ class Dense(nn.Module):
 
         self.features = nn.Sequential(features)
 
+        # Xavier initialization for convolutional and linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight.data)
+
+    def forward(self, x):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+        """
+        raise NotImplementedError
+
+
+class DensePose(Dense):
+    """
+    GNINA Dense model architecture for pose prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    num_blocks: int
+        Number of dense blocks
+    num_block_features: int
+        Number of features in dense block convolutions
+    num_block_convs" int
+        Number of convolutions in dense block
+
+
+    Notes
+    -----
+    Original implementation by Andrew McNutt available here:
+
+        https://github.com/gnina/models/blob/master/pytorch/dense_model.py
+
+    The main difference is that the original implementation resurns the raw output of
+    the last linear layer while here the output is the log softmax of the last linear.
+    """
+
+    def __init__(
+        self,
+        input_dims: Tuple,
+        num_blocks: int = 3,
+        num_block_features: int = 16,
+        num_block_convs: int = 4,
+    ) -> None:
+
+        super().__init__(input_dims, num_blocks, num_block_features, num_block_convs)
+
+        # Linear layer for binding pose prediction
         self.pose = nn.Sequential(
             OrderedDict(
                 [
@@ -522,6 +720,73 @@ class Dense(nn.Module):
             )
         )
 
+        # Xavier initialization for convolutional and linear layers
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight.data)
+
+    def forward(self, x):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+        x = self.features(x)
+
+        # Reshape based on number of channels
+        # Global max pooling reduced spatial dimensions to single value
+        x = x.view(-1, self.features_out_size)
+
+        pose_raw = self.pose(x)
+
+        pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        return pose_log
+
+
+class DenseAffinity(DensePose):
+    """
+    GNINA Dense model architecture for binding affinity prediction.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    num_blocks: int
+        Number of dense blocks
+    num_block_features: int
+        Number of features in dense block convolutions
+    num_block_convs" int
+        Number of convolutions in dense block
+
+
+    Notes
+    -----
+    Original implementation by Andrew McNutt available here:
+
+        https://github.com/gnina/models/blob/master/pytorch/dense_model.py
+
+    The main difference is that the original implementation resurns the raw output of
+    the last linear layer while here the output is the log softmax of the last linear.
+    """
+
+    def __init__(
+        self,
+        input_dims: Tuple,
+        num_blocks: int = 3,
+        num_block_features: int = 16,
+        num_block_convs: int = 4,
+    ) -> None:
+
+        super().__init__(input_dims, num_blocks, num_block_features, num_block_convs)
+
+        # Linear layer for binding affinity prediction
         if self.predict_affinity:
             self.affinity = nn.Sequential(
                 OrderedDict(
@@ -563,17 +828,17 @@ class Dense(nn.Module):
         pose_raw = self.pose(x)
         pose_log = F.log_softmax(pose_raw, dim=1)
 
-        if self.predict_affinity:
-            affinity = self.affinity(x)
-            # Squeeze last (dummy) dimension of affinity prediction
-            # This allows to match the shape (batch_size,) of the target tensor
-            return pose_log, affinity.squeeze(-1)
-        else:
-            return pose_log
+        affinity = self.affinity(x)
+        # Squeeze last (dummy) dimension of affinity prediction
+        # This allows to match the shape (batch_size,) of the target tensor
+        return pose_log, affinity.squeeze(-1)
 
 
 models_dict = {
-    "default2017": Default2017,
-    "default2018": Default2018,
-    "dense": Dense,
+    ("default2017", False): Default2017Pose,
+    ("default2017", True): Default2017Affinity,
+    ("default2018", False): Default2018Pose,
+    ("default2018", True): Default2018Affinity,
+    ("dense", False): DensePose,
+    ("dense", True): DenseAffinity,
 }

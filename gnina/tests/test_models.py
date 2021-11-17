@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from gnina.models import Default2017, Default2018, Dense, DenseBlock
+from gnina.models import DenseBlock, models_dict
 
 
 @pytest.fixture
@@ -19,19 +19,26 @@ def x(batch_size, dims, device):
     return torch.normal(mean=0, std=1, size=(batch_size, *dims), device=device)
 
 
-def test_default2017_forward(batch_size, dims, x, device):
-    model = Default2017(input_dims=dims).to(device)
-    pose_raw, affinity = model(x)
+@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
+def test_forward_pose(batch_size, dims, x, device, model):
+    """
+    Test forward pass of models for pose prediction.
+    """
+    m = models_dict[(model, False)](input_dims=dims).to(device)
+    pose_raw = m(x)
 
     assert pose_raw.shape == (batch_size, 2)
-    assert affinity.shape == (batch_size,)
 
 
-def test_default2018_forward(batch_size, dims, x, device):
-    model = Default2018(input_dims=dims).to(device)
-    pose_raw, affinity = model(x)
+@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
+def test_forward_affinity(batch_size, dims, x, device, model):
+    """
+    Test forward pass of models for pose and binding affinity prediction.
+    """
+    m = models_dict[(model, True)](input_dims=dims).to(device)
+    pose_log, affinity = m(x)
 
-    assert pose_raw.shape == (batch_size, 2)
+    assert pose_log.shape == (batch_size, 2)
     assert affinity.shape == (batch_size,)
 
 
@@ -53,6 +60,7 @@ def test_denseblock_forward_small(
     # block_features for each of the convolutional layers
     assert x.shape[1] == num_block_features * num_block_convs + in_features
     assert x.shape[1] == block.out_features()
+    assert x.shape[0] == batch_size
 
 
 @pytest.mark.parametrize("num_block_convs", [1, 4])
@@ -71,20 +79,4 @@ def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs, 
     # block_features for each of the convolutional layers
     assert x.shape[1] == num_block_features * num_block_convs + in_features
     assert x.shape[1] == block.out_features()
-
-
-@pytest.mark.parametrize("num_block_convs", [1, 4])
-@pytest.mark.parametrize("num_block_features", [8, 16])
-def test_dense_forward(
-    batch_size, x, dims, num_block_features, num_block_convs, device
-):
-    model = Dense(
-        input_dims=dims,
-        num_blocks=3,
-        num_block_features=num_block_features,
-        num_block_convs=num_block_convs,
-    ).to(device)
-    pose_raw, affinity = model(x)
-
-    assert pose_raw.shape == (batch_size, 2)
-    assert affinity.shape == (batch_size,)
+    assert x.shape[0] == batch_size

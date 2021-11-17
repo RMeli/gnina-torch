@@ -151,9 +151,7 @@ def inference(args):
     affinity: bool = True if args.affinity_pos is not None else False
 
     # Create model
-    model = models.models_dict[args.model](test_loader.dims, affinity=affinity).to(
-        device
-    )
+    model = models.models_dict[(args.model, affinity)](test_loader.dims).to(device)
 
     # Load checkpoint
     checkpoint = torch.load(args.checkpoint, map_location=device)

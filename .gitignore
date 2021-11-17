@@ -108,3 +108,19 @@ ENV/
 # editors
 .vscode
 .idea
+
+# data
+examples/Ragoza2017/*
+!examples/Ragoza2017/*.sh
+!examples/Ragoza2017/*.md
+!examples/Ragoza2017/*.py
+!examples/Ragoza2017/assets/
+examples/Francoeur2020/data/
+examples/Francoeur2020/*.tar.gz
+examples/Francoeur2020/PDBbind2016*/*
+!examples/Francoeur2020/PDBbind2016*/*.sh
+!examples/Francoeur2020/PDBbind2016*/*.md
+!examples/Francoeur2020/PDBbind2016*/*.py
+!examples/Francoeur2020/PDBbind2016*/assets/
+
+nohup.out

@@ -830,8 +830,8 @@ def training(args):
     # Select model based on architecture and affinity flag (pose vs affinity)
     model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
 
-    # TODO: Compile model into TorchScript
-    # Requires model refactoring to avoid branching based on affinity
+    # Compile model into TorchScript
+    model = torch.jit.script(model)
 
     optimizer = optim.SGD(
         model.parameters(),
@@ -841,10 +841,13 @@ def training(args):
     )
 
     # Define loss functions
-    pose_loss = nn.NLLLoss()
+    pose_loss = torch.jit.script(nn.NLLLoss())
     affinity_loss = (
-        AffinityLoss(
-            delta=args.delta_affinity_loss, pseudo_huber=args.pseudo_huber_affinity_loss
+        torch.jit.script(
+            AffinityLoss(
+                delta=args.delta_affinity_loss,
+                pseudo_huber=args.pseudo_huber_affinity_loss,
+            )
         )
         if affinity
         else None

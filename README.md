@@ -19,7 +19,7 @@ conda create -f devtools/conda-envs/gninatorch.yaml
 conda activate gninatorch
 ```
 
-Once the [conda](https://docs.conda.io/en/latest/) is created and activate, the `gnina` package can be installed in the environment as follows:
+Once the [conda](https://docs.conda.io/en/latest/) environment is created and activated, the `gnina` package can be installed using [pip](https://pip.pypa.io/en/stable/) as follows:
 ```bash
 python -m pip install .
 ```
@@ -35,7 +35,7 @@ pytest --cov=gnina
 
 Training and inference modules try to follow the original [Caffe](https://caffe.berkeleyvision.org/) implementation of [gnina/scripts](https://github.com/gnina/scripts), however not all features are implemented.
 
-The folder `examples` include some complete examples for training and inference.
+The folder `examples` includes some complete examples for training and inference.
 
 ### Training
 

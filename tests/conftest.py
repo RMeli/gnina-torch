@@ -1,3 +1,5 @@
+import os
+
 import molgrid
 import pytest
 import torch
@@ -35,3 +37,30 @@ def device(pytestconfig):
         device = torch.device("cpu")
 
     return device
+
+
+@pytest.fixture(scope="session")
+def trainfile() -> str:
+    """
+    Path to small training file.
+    """
+    path = os.path.dirname(__file__)
+    return os.path.join(path, "data", "test.types")
+
+
+@pytest.fixture
+def testfile() -> str:
+    """
+    Path to small test file.
+    """
+    path = os.path.dirname(__file__)
+    return os.path.join(path, "data", "test.types")
+
+
+@pytest.fixture(scope="session")
+def dataroot() -> str:
+    """
+    Path to test directory.
+    """
+    path = os.path.dirname(__file__)
+    return os.path.join(path, "data", "mols")

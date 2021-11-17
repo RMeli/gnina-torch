@@ -2,7 +2,7 @@
 
 mkdir -p results
 
-for i in 1 2 3
+for i in 1 2 3 4 5 6
 do
     out="out${i}"
 
@@ -23,4 +23,4 @@ do
     paste -d, results/epochs.dat out*/test-${m}.dat > results/test-${m}.csv
 done
 
-#python plot.py
+python plot.py

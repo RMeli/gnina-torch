@@ -1,6 +1,6 @@
 # GNINA Scoring Function for CASF Dataset
 
-Application test with the goal of reproducing the results from Ragoza et al. (J. Chem. Inf. Model. 2017, 57, 942−957), in particular the ROC AUC as a function of the number of epochs with and without data augmentation similarly to Fig. 3.
+Application test with the goal of reproducing some results from Ragoza et al. (J. Chem. Inf. Model. 2017, 57, 942−957). This application tests allow to compute the ROC AUC as a function of the number of epochs with and without data augmentation in order to reproduce Fig. 3.
 
 ## Data
 

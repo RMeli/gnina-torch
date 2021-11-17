@@ -121,5 +121,6 @@ examples/Francoeur2020/PDBbind2016*/*
 !examples/Francoeur2020/PDBbind2016*/*.sh
 !examples/Francoeur2020/PDBbind2016*/*.md
 !examples/Francoeur2020/PDBbind2016*/*.py
+!examples/Francoeur2020/PDBbind2016*/assets/
 
 nohup.out

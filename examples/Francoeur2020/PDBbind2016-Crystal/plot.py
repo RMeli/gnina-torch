@@ -64,7 +64,6 @@ for fold in range(1, nfolds + 1):
     df_inference["fold"] = fold
 
     df = pd.concat((df_inference, df_types), axis=1)
-    print(df)
 
     # assert np.allclose( df_inference["affinity_exp"].to_numpy(), np.abs(df_types["affinity"].to_numpy()))
 

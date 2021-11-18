@@ -19,8 +19,6 @@ for a in ["augmentation", "no-augmentation"]:
 
         df_all = df_all.append(df, ignore_index=True)
 
-# print(df_all)
-
 sns.lineplot(
     x="Epoch", y="ROC-AUC", hue="Augmentation", style="Phase", data=df_all, markers=True
 )

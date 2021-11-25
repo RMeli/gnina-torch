@@ -17,6 +17,8 @@ class AffinityLoss(nn.Module):
         Penalty factor
     pseudo_huber: bool
         Use pseudo-huber loss as opposed to L2 loss
+    scale: float
+        Scaling factor for the loss
 
     Notes
     -----
@@ -24,6 +26,11 @@ class AffinityLoss(nn.Module):
     implemented.
 
     https://github.com/gnina/gnina/blob/master/caffe/src/caffe/layers/affinity_loss_layer.cpp
+
+    The :code:`scale` parameter is different from the original implementation. In the
+    original Caffe implementation, the :code:`scale` parameter is used to scale the
+    gradients in the backward pass. Here the scale parameter scales the loss function
+    directly in the forward pass.
 
     Definition of pseudo-Huber loss:
     https://en.wikipedia.org/wiki/Huber_loss#Pseudo-Huber_loss_function
@@ -34,7 +41,8 @@ class AffinityLoss(nn.Module):
         reduction: str = "mean",
         delta: float = 1.0,
         penalty: float = 0.0,
-        pseudo_huber: bool = True,
+        pseudo_huber: bool = False,
+        scale: float = 1.0,
     ):
         super().__init__()
 
@@ -42,6 +50,7 @@ class AffinityLoss(nn.Module):
         self.delta2: float = delta * delta
         self.penalty: float = penalty
         self.pseudo_huber: bool = pseudo_huber
+        self.scale: float = scale
 
         assert reduction in ["mean", "sum"]
         self.reduction: str = reduction
@@ -73,16 +82,15 @@ class AffinityLoss(nn.Module):
             diff,
         )
 
-        # TODO: add diff_for_zero parameter
-
-        scaled_diff = diff / self.delta
-
         if self.pseudo_huber:
+            scaled_diff = diff / self.delta
             loss = self.delta2 * (torch.sqrt(1.0 + scaled_diff * scaled_diff) - 1.0)
-        else:
-            loss = scaled_diff * scaled_diff
+        else:  # L2 loss
+            loss = diff * diff
 
-        if self.reduction == "sum":
-            return torch.sum(loss)
-        else:
-            return torch.mean(loss)
+        if self.reduction == "mean":
+            reduced_loss = torch.mean(loss)
+        elif self.reduction == "sum":
+            reduced_loss = torch.sum(loss)
+
+        return self.scale * reduced_loss

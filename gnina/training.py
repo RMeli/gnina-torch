@@ -166,6 +166,18 @@ def options(args: Optional[List[str]] = None):
         default=4.0,
         help="Delta factor for affinity loss",
     )
+    parser.add_argument(
+        "--scale_affinity_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for affinity loss",
+    )
+    parser.add_argument(
+        "--penalty_affinity_loss",
+        type=float,
+        default=1.0,
+        help="Penalty for affinity loss",
+    )
 
     # Misc
     parser.add_argument(
@@ -590,7 +602,10 @@ def training(args):
     pose_loss = nn.NLLLoss()
     affinity_loss = (
         AffinityLoss(
-            delta=args.delta_affinity_loss, pseudo_huber=args.pseudo_huber_affinity_loss
+            delta=args.delta_affinity_loss,
+            penalty=args.penalty_affinity_loss,
+            pseudo_huber=args.pseudo_huber_affinity_loss,
+            scale=args.scale_affinity_loss,
         )
         if affinity
         else None

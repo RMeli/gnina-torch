@@ -1,6 +1,6 @@
 #!/bin/bash
 
-checkpoint="checkpoint_650.pt"
+checkpoint="checkpoint_550.pt"
 
 for i in 1 2 3 4 5 6
 do

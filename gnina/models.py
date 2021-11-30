@@ -1014,7 +1014,7 @@ class HiResAffinity(nn.Module):
                     ),
                     ("unit2_func", nn.ReLU()),
                     # unit3
-                    ("unit3_pool", nn.MaxPool3d(kernel_size=8, stride=8)),
+                    ("unit3_pool", nn.AvgPool3d(kernel_size=8, stride=8)),
                     (
                         "unit3_conv",
                         nn.Conv3d(

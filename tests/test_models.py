@@ -50,6 +50,10 @@ def test_forward_pose(batch_size, dims, x, device, model):
 def test_forward_affinity(batch_size, dims, x, device, model):
     """
     Test forward pass of models for pose and binding affinity prediction.
+
+    Notes
+    -----
+    All models but :code:`hires_affinity`, which requires larger spatial dimensions.
     """
     m = models_dict[(model, True)](input_dims=dims).to(device)
     pose_log, affinity = m(x)

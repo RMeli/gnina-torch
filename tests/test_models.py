@@ -15,8 +15,24 @@ def dims():
 
 
 @pytest.fixture
+def dims_big():
+    """
+    Less channels, but bigger spatial dimensions (like original input)
+    """
+    return (3, 48, 48, 48)
+
+
+@pytest.fixture
 def x(batch_size, dims, device):
     return torch.normal(mean=0, std=1, size=(batch_size, *dims), device=device)
+
+
+@pytest.fixture
+def x_big(batch_size, dims_big, device):
+    """
+    HiResAffinity has as an aggressive pooling, so we need the standard input size.
+    """
+    return torch.normal(mean=0, std=1, size=(batch_size, *dims_big), device=device)
 
 
 @pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
@@ -30,13 +46,31 @@ def test_forward_pose(batch_size, dims, x, device, model):
     assert pose_raw.shape == (batch_size, 2)
 
 
-@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
+@pytest.mark.parametrize("model", ["default2017", "default2018", "dense", "hires_pose"])
 def test_forward_affinity(batch_size, dims, x, device, model):
     """
     Test forward pass of models for pose and binding affinity prediction.
+
+    Notes
+    -----
+    All models but :code:`hires_affinity`, which requires larger spatial dimensions.
     """
     m = models_dict[(model, True)](input_dims=dims).to(device)
     pose_log, affinity = m(x)
+
+    assert pose_log.shape == (batch_size, 2)
+    assert affinity.shape == (batch_size,)
+
+
+@pytest.mark.parametrize(
+    "model", ["default2017", "default2018", "dense", "hires_pose", "hires_affinity"]
+)
+def test_forward_affinity_big(batch_size, dims_big, x_big, device, model):
+    """
+    Test forward pass of models for pose and binding affinity prediction.
+    """
+    m = models_dict[(model, True)](input_dims=dims_big).to(device)
+    pose_log, affinity = m(x_big)
 
     assert pose_log.shape == (batch_size, 2)
     assert affinity.shape == (batch_size,)

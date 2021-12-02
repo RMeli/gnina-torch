@@ -18,7 +18,7 @@ from torch import nn, optim
 from gnina import metrics, setup, utils
 from gnina.dataloaders import GriddedExamplesLoader
 from gnina.losses import AffinityLoss
-from gnina.models import models_dict
+from gnina.models import models_dict, weights_and_biases_init
 
 
 def options(args: Optional[List[str]] = None):
@@ -587,6 +587,7 @@ def training(args):
     # Create model
     # Select model based on architecture and affinity flag (pose vs affinity)
     model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
+    model.apply(weights_and_biases_init)
 
     # TODO: Compile model into TorchScript
     # Requires model refactoring to avoid branching based on affinity

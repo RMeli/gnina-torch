@@ -153,6 +153,9 @@ def inference(args):
     # Create model
     model = models.models_dict[(args.model, affinity)](test_loader.dims).to(device)
 
+    # Compile model with TorchScript
+    model = torch.jit.script(model)
+
     # Load checkpoint
     checkpoint = torch.load(args.checkpoint, map_location=device)
     Checkpoint.load_objects(to_load={"model": model}, checkpoint=checkpoint)

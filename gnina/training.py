@@ -589,8 +589,8 @@ def training(args):
     model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
     model.apply(weights_and_biases_init)
 
-    # TODO: Compile model into TorchScript
-    # Requires model refactoring to avoid branching based on affinity
+    # Compile model into TorchScript
+    model = torch.jit.script(model)
 
     optimizer = optim.SGD(
         model.parameters(),
@@ -600,13 +600,15 @@ def training(args):
     )
 
     # Define loss functions
-    pose_loss = nn.NLLLoss()
+    pose_loss = torch.jit.script(nn.NLLLoss())
     affinity_loss = (
-        AffinityLoss(
-            delta=args.delta_affinity_loss,
-            penalty=args.penalty_affinity_loss,
-            pseudo_huber=args.pseudo_huber_affinity_loss,
-            scale=args.scale_affinity_loss,
+        torch.jit.script(
+            AffinityLoss(
+                delta=args.delta_affinity_loss,
+                penalty=args.penalty_affinity_loss,
+                pseudo_huber=args.pseudo_huber_affinity_loss,
+                scale=args.scale_affinity_loss,
+            )
         )
         if affinity
         else None

@@ -90,7 +90,7 @@ class AffinityLoss(nn.Module):
 
         if self.reduction == "mean":
             reduced_loss = torch.mean(loss)
-        elif self.reduction == "sum":
+        else:  # Assertion in init ensures that reduction is "sum"
             reduced_loss = torch.sum(loss)
 
         return self.scale * reduced_loss

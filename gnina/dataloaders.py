@@ -17,6 +17,8 @@ class GriddedExamplesLoader:
         Ligand pose annotation label position
     affinity_pos: Optional[int]
         Affinity annotation position
+    flexlabel_pos: Optional[int]
+        Receptor (side chains) pose annotation label position
     random_translation : float
         Random translation applied to each example on each cartesian axis
     random_rotation : bool
@@ -45,6 +47,7 @@ class GriddedExamplesLoader:
         grid_maker,
         label_pos: int = 0,
         affinity_pos: Optional[int] = None,
+        flexlabel_pos: Optional[int] = None,
         random_translation: float = 0.0,
         random_rotation: bool = False,
         device: torch.device = torch.device("cpu"),
@@ -56,6 +59,7 @@ class GriddedExamplesLoader:
         self.grid_maker = grid_maker
         self.label_pos = label_pos
         self.affinity_pos = affinity_pos
+        self.flexlabel_pos = flexlabel_pos
         self.random_translation = random_translation
         self.random_rotation = random_rotation
         self.device = device
@@ -115,12 +119,8 @@ class GriddedExamplesLoader:
 
         batch_size = len(batch)
 
-        grids = torch.zeros((batch_size, *self.dims), device=self.device)
-        labels = torch.zeros((batch_size,), device=self.device)
-        if self.affinity_pos is not None:
-            affinities = torch.zeros((batch_size,), device=self.device)
-
         # Compute grids from examples
+        grids = torch.zeros((batch_size, *self.dims), device=self.device)
         self.grid_maker.forward(
             batch,
             grids,
@@ -128,20 +128,40 @@ class GriddedExamplesLoader:
             random_rotation=self.random_rotation,
         )
 
+        # Ligand pose labels
+        # Convert labels to integers; libmolgrid only supports float labels
+        labels = torch.zeros((batch_size,), device=self.device)
         batch.extract_label(self.label_pos, labels)
+        labels = labels.long()  # Convert labels to integer
+
+        # Affinity values
         if self.affinity_pos is not None:
+            affinities = torch.zeros((batch_size,), device=self.device)
             batch.extract_label(self.affinity_pos, affinities)
 
-        # Convert labels to integers
-        # libmolgrid only supports float input
-        labels = labels.long()
+        # Flexible side chains pose labels
+        # Convert labels to integers; libmolgrid only supports float labels
+        if self.flexlabel_pos is not None:
+            flexlabels = torch.zeros((batch_size,), device=self.device)
+            batch.extract_label(self.flexlabel_pos, flexlabels)
+            flexlabels = flexlabels.long()
 
-        if self.affinity_pos is None:
+        # Return appropriate tensors depending on labels extracted
+        if self.affinity_pos is None and self.flexlabel_pos is None:
             # Return grids and labels
             return grids, labels
-        else:
+        elif self.affinity_pos is not None and self.flexlabel_pos is None:
             # Return grids, labels and affinities
             return grids, labels, affinities
+        elif self.affinity_pos is None and self.flexlabel_pos is not None:
+            # Return grids, labels and flexlabels
+            return grids, labels, flexlabels
+        elif self.affinity_pos is not None and self.flexlabel_pos is not None:
+            # Return grids, labels, affinities and flexlabels
+            return grids, labels, affinities, flexlabels
+        else:
+            # This should never occur...
+            raise NotImplementedError
 
     def __iter__(self):
         """

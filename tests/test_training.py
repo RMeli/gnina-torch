@@ -1,21 +1,6 @@
-import os
-import sys
-
 import pytest
 
 from gnina import training
-
-
-@pytest.fixture
-def trainfile() -> str:
-    gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
-    return os.path.join(gnina_path, "data", "test.types")
-
-
-@pytest.fixture
-def dataroot() -> str:
-    gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
-    return os.path.join(gnina_path, "data", "test")
 
 
 def test_options_default(trainfile):

@@ -5,6 +5,7 @@
 epochs=1000
 test_every=5
 
+
 # GPU: 0
 for i in 1 2 3
 do
@@ -23,11 +24,13 @@ python -m gnina.training \
     --stratify_receptor \
     --label_pos 0 \
     --affinity_pos 1 \
+    --scale_affinity_loss 0.05 \
     --silent \
     --seed ${i} \
     --gpu cuda:0 \
     --out_dir out${i} &
 done
+
 
 # GPU: 1
 for i in 4 5 6
@@ -47,6 +50,7 @@ python -m gnina.training \
     --stratify_receptor \
     --label_pos 0 \
     --affinity_pos 1 \
+    --scale_affinity_loss 0.05 \
     --silent \
     --seed ${i} \
     --gpu cuda:1 \

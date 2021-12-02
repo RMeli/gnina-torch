@@ -11,7 +11,7 @@ import torch
 from ignite.engine import Events
 from ignite.handlers import Checkpoint
 
-from gnina import models, setup, training, utils
+from gnina import metrics, models, setup, training, utils
 from gnina.dataloaders import GriddedExamplesLoader
 
 
@@ -162,7 +162,7 @@ def inference(args):
 
     # TODO: Allow prediction for systems without known pose or affinity
     # Setup metrics but do not compute losses
-    allmetrics = training._setup_metrics(
+    allmetrics = metrics.setup_metrics(
         affinity,
         pose_loss=None,
         affinity_loss=None,

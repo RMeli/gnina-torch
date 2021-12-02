@@ -1,29 +1,8 @@
-import os
-import sys
-
 import pytest
 import torch
 
 from gnina import setup, training
 from gnina.dataloaders import GriddedExamplesLoader
-
-
-@pytest.fixture
-def trainfile() -> str:
-    """
-    Path to small training file.
-    """
-    gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
-    return os.path.join(gnina_path, "data", "test.types")
-
-
-@pytest.fixture
-def dataroot() -> str:
-    """
-    Path to test directory.
-    """
-    gnina_path = os.path.dirname(sys.modules["gnina"].__file__)
-    return os.path.join(gnina_path, "data", "test")
 
 
 @pytest.mark.parametrize("iteration_scheme", ["small", "large"])

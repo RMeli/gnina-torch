@@ -42,7 +42,7 @@ jobs:
     - uses: conda-incubator/setup-miniconda@v2
       with:
         python-version: ${{ matrix.python-version }}
-        environment-file: devtools/conda-envs/gnina.yaml
+        environment-file: devtools/conda-envs/gninatorch.yaml
 
         channels: conda-forge,defaults
 
@@ -66,7 +66,7 @@ jobs:
       shell: bash -l {0}
 
       run: |
-        pytest -v --cov=gnina --cov-report=xml --color=yes gnina/tests/ --nogpu
+        pytest -v --cov=gnina --cov-report=xml --color=yes tests/ --nogpu
 
     - name: CodeCov
       uses: codecov/codecov-action@v1

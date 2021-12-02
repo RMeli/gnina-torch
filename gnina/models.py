@@ -21,6 +21,28 @@ import torch.nn.functional as F
 from torch import nn
 
 
+def weights_and_biases_init(m: nn.Module) -> None:
+    """
+    Initialize the weights and biases of the model.
+
+    Parameters
+    ----------
+    m : nn.Module
+        Module (layer) to initialize
+
+    Notes
+    -----
+    This function is used to initialize the weights of the model for both convolutional
+    and linear layers. Weights are initialized using uniform Xavier initialization
+    while biases are set to zero.
+
+    https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L45-L48
+    """
+    if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight.data)
+        nn.init.constant_(m.bias.data, 0.0)
+
+
 class Default2017(nn.Module):
     """
     GNINA default2017 model architecture.
@@ -134,13 +156,6 @@ class Default2017Pose(Default2017):
             )
         )
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
-
     def forward(self, x: torch.Tensor):
         """
         Parameters
@@ -196,13 +211,6 @@ class Default2017Affinity(Default2017Pose):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -368,13 +376,6 @@ class Default2018Pose(Default2018):
             )
         )
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
-
     def forward(self, x: torch.Tensor):
         """
         Parameters
@@ -429,13 +430,6 @@ class Default2018Affinity(Default2018Pose):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -588,7 +582,6 @@ class Dense(nn.Module):
         super().__init__()
 
         self.input_dims = input_dims
-        self.predict_affinity = affinity
 
         features: OrderedDict[str, nn.Module] = OrderedDict(
             [
@@ -657,11 +650,6 @@ class Dense(nn.Module):
 
         self.features = nn.Sequential(features)
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-
     def forward(self, x):
         """
         Parameters
@@ -720,11 +708,6 @@ class DensePose(Dense):
             )
         )
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-
     def forward(self, x):
         """
         Parameters
@@ -741,8 +724,6 @@ class DensePose(Dense):
         # Reshape based on number of channels
         # Global max pooling reduced spatial dimensions to single value
         x = x.view(-1, self.features_out_size)
-
-        pose_raw = self.pose(x)
 
         pose_raw = self.pose(x)
         pose_log = F.log_softmax(pose_raw, dim=1)
@@ -787,24 +768,16 @@ class DenseAffinity(DensePose):
         super().__init__(input_dims, num_blocks, num_block_features, num_block_convs)
 
         # Linear layer for binding affinity prediction
-        if self.predict_affinity:
-            self.affinity = nn.Sequential(
-                OrderedDict(
-                    [
-                        (
-                            "affinity_output",
-                            nn.Linear(
-                                in_features=self.features_out_size, out_features=1
-                            ),
-                        )
-                    ]
-                )
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
             )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
+        )
 
     def forward(self, x):
         """
@@ -824,6 +797,265 @@ class DenseAffinity(DensePose):
         x = x.view(-1, self.features_out_size)
 
         pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        affinity = self.affinity(x)
+        # Squeeze last (dummy) dimension of affinity prediction
+        # This allows to match the shape (batch_size,) of the target tensor
+        return pose_log, affinity.squeeze(-1)
+
+
+class HiResPose(nn.Module):
+    """
+    GNINA HiResPose model architecture.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architecture was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/hires_pose.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax.
+
+    This model is implemented only for multi-task pose and affinity prediction.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__()
+
+        self.input_dims = input_dims
+
+        self.features = nn.Sequential(
+            OrderedDict(
+                [
+                    # unit1
+                    (
+                        "unit1_conv",
+                        nn.Conv3d(
+                            in_channels=input_dims[0],
+                            out_channels=32,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                        ),
+                    ),
+                    ("unit1_func", nn.ReLU()),
+                    # unit2
+                    ("unit2_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
+                    (
+                        "unit2_conv",
+                        nn.Conv3d(
+                            in_channels=32,
+                            out_channels=64,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                        ),
+                    ),
+                    ("unit2_func", nn.ReLU()),
+                    # unit3
+                    ("unit3_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
+                    (
+                        "unit3_conv",
+                        nn.Conv3d(
+                            in_channels=64,
+                            out_channels=128,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                        ),
+                    ),
+                    ("unit3_func", nn.ReLU()),
+                ]
+            )
+        )
+
+        # Two MaxPool3d layers with kernel_size=2 and stride=2
+        # Spatial dimensions are halved at each pooling step
+        self.features_out_size = (
+            input_dims[1] // 4 * input_dims[2] // 4 * input_dims[3] // 4 * 128
+        )
+
+        # Linear layer for pose prediction
+        self.pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for binding affinity prediction
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+        x = self.features(x)
+
+        print("FEATURES SHAPE:", x.shape)
+
+        # Reshape based on number of channels
+        # Global max pooling reduced spatial dimensions to single value
+        x = x.view(-1, self.features_out_size)
+
+        pose_raw = self.pose(x)
+        pose_log = F.log_softmax(pose_raw, dim=1)
+
+        affinity = self.affinity(x)
+        # Squeeze last (dummy) dimension of affinity prediction
+        # This allows to match the shape (batch_size,) of the target tensor
+        return pose_log, affinity.squeeze(-1)
+
+
+class HiResAffinity(nn.Module):
+    """
+    GNINA HiResAffinity model architecture.
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+
+    Notes
+    -----
+    This architecture was translated from the following Caffe model:
+
+        https://github.com/gnina/models/blob/master/crossdocked_paper/hires_pose.model
+
+    The main difference is that the PyTorch implementation resurns the log softmax.
+
+    This model is implemented only for multi-task pose and affinity prediction.
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__()
+
+        self.input_dims = input_dims
+
+        self.features = nn.Sequential(
+            OrderedDict(
+                [
+                    # unit1
+                    (
+                        "unit1_conv",
+                        nn.Conv3d(
+                            in_channels=input_dims[0],
+                            out_channels=32,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                        ),
+                    ),
+                    ("unit1_func", nn.ReLU()),
+                    # unit2
+                    (
+                        "unit2_conv",
+                        nn.Conv3d(
+                            in_channels=32,
+                            out_channels=64,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                        ),
+                    ),
+                    ("unit2_func", nn.ReLU()),
+                    # unit3
+                    ("unit3_pool", nn.AvgPool3d(kernel_size=8, stride=8)),
+                    (
+                        "unit3_conv",
+                        nn.Conv3d(
+                            in_channels=64,
+                            out_channels=128,
+                            kernel_size=5,
+                            stride=1,
+                            padding=2,
+                        ),
+                    ),
+                    ("unit3_func", nn.ELU(alpha=1.0)),
+                    # unit5 (following original naming convention)
+                    ("unit5_pool", nn.MaxPool3d(kernel_size=4, stride=4)),
+                ]
+            )
+        )
+
+        self.features_out_size = (
+            input_dims[1]
+            // (8 * 4)
+            * input_dims[2]
+            // (8 * 4)
+            * input_dims[3]
+            // (8 * 4)
+            * 128
+        )
+
+        # Linear layer for pose prediction
+        self.pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for binding affinity prediction
+        self.affinity = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "affinity_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=1),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+        x = self.features(x)
+
+        # Reshape based on number of channels
+        # Global max pooling reduced spatial dimensions to single value
+        x = x.view(-1, self.features_out_size)
 
         pose_raw = self.pose(x)
         pose_log = F.log_softmax(pose_raw, dim=1)
@@ -841,4 +1073,6 @@ models_dict = {
     ("default2018", True): Default2018Affinity,
     ("dense", False): DensePose,
     ("dense", True): DenseAffinity,
+    ("hires_pose", True): HiResPose,
+    ("hires_affinity", True): HiResAffinity,
 }

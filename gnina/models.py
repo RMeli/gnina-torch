@@ -21,6 +21,28 @@ import torch.nn.functional as F
 from torch import nn
 
 
+def weights_and_biases_init(m: nn.Module) -> None:
+    """
+    Initialize the weights and biases of the model.
+
+    Parameters
+    ----------
+    m : nn.Module
+        Module (layer) to initialize
+
+    Notes
+    -----
+    This function is used to initialize the weights of the model for both convolutional
+    and linear layers. Weights are initialized using uniform Xavier initialization
+    while biases are set to zero.
+
+    https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L45-L48
+    """
+    if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight.data)
+        nn.init.constant_(m.bias.data, 0.0)
+
+
 class Default2017(nn.Module):
     """
     GNINA default2017 model architecture.
@@ -134,13 +156,6 @@ class Default2017Pose(Default2017):
             )
         )
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
-
     def forward(self, x: torch.Tensor):
         """
         Parameters
@@ -196,13 +211,6 @@ class Default2017Affinity(Default2017Pose):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -368,13 +376,6 @@ class Default2018Pose(Default2018):
             )
         )
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
-
     def forward(self, x: torch.Tensor):
         """
         Parameters
@@ -429,13 +430,6 @@ class Default2018Affinity(Default2018Pose):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-                # TODO: Initialize bias to zero?
-                # TODO: See https://github.com/gnina/libmolgrid/blob/e6d5f36f1ae03f643ca69cdec1625ac52e653f88/test/test_torch_cnn.py#L48
 
     def forward(self, x: torch.Tensor):
         """
@@ -656,11 +650,6 @@ class Dense(nn.Module):
 
         self.features = nn.Sequential(features)
 
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
-
     def forward(self, x):
         """
         Parameters
@@ -718,11 +707,6 @@ class DensePose(Dense):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
 
     def forward(self, x):
         """
@@ -794,11 +778,6 @@ class DenseAffinity(DensePose):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
 
     def forward(self, x):
         """
@@ -926,11 +905,6 @@ class HiResPose(nn.Module):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
 
     def forward(self, x: torch.Tensor):
         """
@@ -1065,11 +1039,6 @@ class HiResAffinity(nn.Module):
                 ]
             )
         )
-
-        # Xavier initialization for convolutional and linear layers
-        for m in self.modules():
-            if isinstance(m, nn.Conv3d) or isinstance(m, nn.Linear):
-                nn.init.xavier_uniform_(m.weight.data)
 
     def forward(self, x: torch.Tensor):
         """

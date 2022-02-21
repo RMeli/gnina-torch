@@ -353,7 +353,7 @@ class Default2018Pose(Default2018):
 
     Notes
     -----
-    This architectre was translated from the following Caffe model:
+    This architecture was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
 
@@ -566,7 +566,7 @@ class Dense(nn.Module):
 
         https://github.com/gnina/models/blob/master/pytorch/dense_model.py
 
-    The main difference is that the original implementation resurns the raw output of
+    The main difference is that the original implementation returns the raw output of
     the last linear layer while here the output is the log softmax of the last linear.
     """
 

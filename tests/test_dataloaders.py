@@ -308,3 +308,241 @@ def test_GriddedExamplesLoader_batch_size_2_no_balancing(
 
         # Restart iterator
         dataset = iter(dataset)
+
+
+def test_GriddedExamplesLoader_balanced_batch_size_2_affinity(
+    trainfile, dataroot, device
+):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args_small = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--balanced",
+            "--batch_size",
+            "2",
+            "--affinity_pos",
+            "1",
+        ]
+    )
+    e_small = setup.setup_example_provider(args_small.trainfile, args_small)
+    gmaker_small = setup.setup_grid_maker(args_small)
+
+    dataset_small = GriddedExamplesLoader(
+        example_provider=e_small,
+        grid_maker=gmaker_small,
+        affinity_pos=args_small.affinity_pos,
+        device=device,
+    )
+
+    # Dataset test.types contains one positive example and two negative examples
+    # Balancing (minority class oversampling) results in different epoch sizes
+    assert dataset_small.num_examples_tot == 3
+    assert dataset_small.num_labels == 3
+    assert dataset_small.num_examples_per_epoch == 2  # Twice the minority class
+    assert dataset_small.num_batches == 1
+    assert dataset_small.last_batch_size == 0
+
+    # With a batch_size of 2, only one batch can be loaded in a small epoch since there
+    # is only one example in the minority class
+    for _ in range(10):  # Simulate epochs
+        # Load the only batch
+        grids, labels, affinity = next(dataset_small)
+        assert grids.shape == (2, 28, 48, 48, 48)
+        assert labels.shape == (2,)
+        assert affinity.shape == (2,)
+
+        # The positive example is sampled once, with one of the negative examples
+        assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+        assert torch.allclose(affinity, torch.tensor([2.1, 1.1], device=device))
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_small)
+
+        # Restart iterator
+        dataset_small = iter(dataset_small)
+
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args_large = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--balanced",
+            "--batch_size",
+            "2",
+            "--iteration_scheme",
+            "large",
+            "--affinity_pos",
+            "1",
+        ]
+    )
+    e_large = setup.setup_example_provider(args_large.trainfile, args_large)
+    gmaker_large = setup.setup_grid_maker(args_large)
+
+    dataset_large = GriddedExamplesLoader(
+        example_provider=e_large,
+        grid_maker=gmaker_large,
+        affinity_pos=args_large.affinity_pos,
+        device=device,
+    )
+
+    # Dataset test.types contains one positive example and two negative examples
+    # Balancing (minority class oversampling) results in different epoch sizes
+    assert dataset_large.num_examples_tot == 3
+    assert dataset_large.num_labels == 3
+    assert dataset_large.num_examples_per_epoch == 4  # Twice the majority class
+    assert dataset_large.num_batches == 2
+    assert dataset_large.last_batch_size == 0
+
+    # With a batch_size of 2, only two batches can be loaded in a large epoch since
+    # there are two examples in the manjority class
+    for _ in range(10):  # Simulate epochs
+        # Load two batches
+        for _ in range(2):
+            grids, labels, affinity = next(dataset_large)
+            assert grids.shape == (2, 28, 48, 48, 48)
+            assert labels.shape == (2,)
+            assert affinity.shape == (2,)
+
+            # The positive example is sampled twice, one for each of the negative examples
+            assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+            # Two possible outcomes for the binding affinity
+            # with balancing and large epoch
+            p1 = torch.tensor([2.1, 1.1], device=device)
+            p2 = torch.tensor([2.1, 3.1], device=device)
+            assert torch.allclose(affinity, p1) or torch.allclose(affinity, p2)
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_large)
+
+        # Restart iterator
+        dataset_large = iter(dataset_large)
+
+
+def test_GriddedExamplesLoader_balanced_batch_size_2_flexlabel(
+    trainfile, dataroot, device
+):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args_small = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--balanced",
+            "--batch_size",
+            "2",
+            "--flexlabel_pos",
+            "2",
+        ]
+    )
+    e_small = setup.setup_example_provider(args_small.trainfile, args_small)
+    gmaker_small = setup.setup_grid_maker(args_small)
+
+    dataset_small = GriddedExamplesLoader(
+        example_provider=e_small,
+        grid_maker=gmaker_small,
+        flexlabel_pos=args_small.flexlabel_pos,
+        device=device,
+    )
+
+    # Dataset test.types contains one positive example and two negative examples
+    # Balancing (minority class oversampling) results in different epoch sizes
+    assert dataset_small.num_examples_tot == 3
+    assert dataset_small.num_labels == 3
+    assert dataset_small.num_examples_per_epoch == 2  # Twice the minority class
+    assert dataset_small.num_batches == 1
+    assert dataset_small.last_batch_size == 0
+
+    # With a batch_size of 2, only one batch can be loaded in a small epoch since there
+    # is only one example in the minority class
+    for _ in range(10):  # Simulate epochs
+        # Load the only batch
+        grids, labels, flexlabels = next(dataset_small)
+        assert grids.shape == (2, 28, 48, 48, 48)
+        assert labels.shape == (2,)
+        assert flexlabels.shape == (2,)
+
+        # The positive example is sampled once, with one of the negative examples
+        assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+        assert torch.allclose(flexlabels, torch.tensor([1, 1], device=device))
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_small)
+
+        # Restart iterator
+        dataset_small = iter(dataset_small)
+
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args_large = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--balanced",
+            "--batch_size",
+            "2",
+            "--iteration_scheme",
+            "large",
+            "--flexlabel_pos",
+            "2",
+        ]
+    )
+    e_large = setup.setup_example_provider(args_large.trainfile, args_large)
+    gmaker_large = setup.setup_grid_maker(args_large)
+
+    dataset_large = GriddedExamplesLoader(
+        example_provider=e_large,
+        grid_maker=gmaker_large,
+        flexlabel_pos=args_large.flexlabel_pos,
+        device=device,
+    )
+
+    # Dataset test.types contains one positive example and two negative examples
+    # Balancing (minority class oversampling) results in different epoch sizes
+    assert dataset_large.num_examples_tot == 3
+    assert dataset_large.num_labels == 3
+    assert dataset_large.num_examples_per_epoch == 4  # Twice the majority class
+    assert dataset_large.num_batches == 2
+    assert dataset_large.last_batch_size == 0
+
+    # With a batch_size of 2, only two batches can be loaded in a large epoch since
+    # there are two examples in the manjority class
+    for _ in range(10):  # Simulate epochs
+        # Load two batches
+        for _ in range(2):
+            grids, labels, flexlabels = next(dataset_large)
+            assert grids.shape == (2, 28, 48, 48, 48)
+            assert labels.shape == (2,)
+            assert flexlabels.shape == (2,)
+
+            # The positive example is sampled twice, one for each of the negative examples
+            assert torch.allclose(labels, torch.tensor([1, 0], device=device))
+
+            # Two possible outcomes for the binding affinity
+            # with balancing and large epoch
+            p1 = torch.tensor([1, 1], device=device)
+            p2 = torch.tensor([1, 0], device=device)
+            assert torch.allclose(flexlabels, p1) or torch.allclose(flexlabels, p2)
+
+        # Check that the iterator is exhausted at the end of an epoch
+        with pytest.raises(StopIteration):
+            next(dataset_large)
+
+        # Restart iterator
+        dataset_large = iter(dataset_large)

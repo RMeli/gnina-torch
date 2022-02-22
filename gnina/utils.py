@@ -97,7 +97,8 @@ def set_device(device_name: str) -> torch.device:
     device = torch.device(device_name)
     if "cuda" in device_name:
         try:  # cuda:IDX
-            molgrid.set_gpu_device(int(device_name[-1]))
+            idx = int(device_name[-1])
+            molgrid.set_gpu_device(idx)
         except ValueError:  # cuda
             # Set device 0 by default
             molgrid.set_gpu_device(0)

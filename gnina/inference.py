@@ -65,6 +65,12 @@ def options(args: Optional[List[str]] = None):
         help="Affinity value position in training file",
     )
     parser.add_argument(
+        "--flex_pos",
+        type=int,
+        default=None,
+        help="Flexible residues pose label position in training file",
+    )
+    parser.add_argument(
         "--ligmolcache",
         type=str,
         default="",
@@ -106,6 +112,8 @@ def inference(args):
     ----------
     args:
     """
+    # Affinity prediction not supported with flexible residues (and vice versa)
+    assert args.affinity_pos is None or args.flex_pos is None
 
     # Create necessary directories if not already present
     os.makedirs(args.out_dir, exist_ok=True)
@@ -149,9 +157,12 @@ def inference(args):
     )
 
     affinity: bool = True if args.affinity_pos is not None else False
+    flex: bool = True if args.flex_pos is not None else False
 
     # Create model
-    model = models.models_dict[(args.model, affinity)](test_loader.dims).to(device)
+    model = models.models_dict[(args.model, affinity, flex)](test_loader.dims).to(
+        device
+    )
 
     # Compile model with TorchScript
     model = torch.jit.script(model)

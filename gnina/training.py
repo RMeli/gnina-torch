@@ -64,6 +64,12 @@ def options(args: Optional[List[str]] = None):
         help="Affinity value position in training file",
     )
     parser.add_argument(
+        "--flex_pos",
+        type=int,
+        default=None,
+        help="Flexible residues pose label position in training file",
+    )
+    parser.add_argument(
         "--stratify_receptor",
         action="store_true",
         help="Sample uniformly across receptors",
@@ -523,6 +529,8 @@ def training(args):
     the structures that are read from .gninatypes files. The training then speeds up
     considerably.
     """
+    # Affinity prediction not supported with flexible residues (and vice versa)
+    assert args.affinity_pos is None or args.flex_pos is None
 
     # Create necessary directories if not already present
     os.makedirs(args.out_dir, exist_ok=True)
@@ -583,10 +591,11 @@ def training(args):
         assert test_loader.dims == train_loader.dims
 
     affinity: bool = True if args.affinity_pos is not None else False
+    flex: bool = True if args.flex_pos is not None else False
 
     # Create model
     # Select model based on architecture and affinity flag (pose vs affinity)
-    model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
+    model = models_dict[(args.model, affinity, flex)](train_loader.dims).to(device)
     model.apply(weights_and_biases_init)
 
     # Compile model into TorchScript

@@ -6,14 +6,14 @@ Notes
 The PyTorch models try to follow the original Caffe models as much as possible. However,
 some changes are necessary.
 
-The :code:`MolDataLayer` is now separated from the model and the parameters are
+Notable differences:
+* The :code:`MolDataLayer` is now separated from the model and the parameters are
 controlled by CLI arguments in the training process.
-
-The model output for pose prediction corresponds to the log softmax of the last fully-
+* The model output for pose prediction corresponds to the log softmax of the last fully-
 connected layer instead of the softmax.
 """
 
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 from typing import Tuple, Union
 
 import torch
@@ -234,6 +234,72 @@ class Default2017Affinity(Default2017Pose):
         # Squeeze last (dummy) dimension of affinity prediction
         # This allows to match the shape (batch_size,) of the target tensor
         return pose_log, affinity.squeeze(-1)
+
+
+class Default2017Flex(Default2017):
+    """
+    GNINA default2017 model architecture for multi-task (MT) pose prediction (ligand and
+    flexible residues).
+
+    Poses are annotated based on both ligand RMSD and flexible residues RMSD (w.r.t. the
+    cognate receptor in the case of cross-docking).
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for ligand pose prediction
+        self.lig_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "lig_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for flexible residues pose prediction
+        self.flex_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "flex_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+
+        x = self.features(x)
+        x = x.view(-1, self.features_out_size)
+
+        lig_pose_raw = self.lig_pose(x)
+        lig_pose_log = F.log_softmax(lig_pose_raw, dim=1)
+
+        flex_pose_raw = self.flex_pose(x)
+        flex_pose_log = F.log_softmax(flex_pose_raw, dim=1)
+
+        return lig_pose_log, flex_pose_log
 
 
 class Default2018(nn.Module):
@@ -919,8 +985,6 @@ class HiResPose(nn.Module):
         """
         x = self.features(x)
 
-        print("FEATURES SHAPE:", x.shape)
-
         # Reshape based on number of channels
         # Global max pooling reduced spatial dimensions to single value
         x = x.view(-1, self.features_out_size)
@@ -1066,13 +1130,17 @@ class HiResAffinity(nn.Module):
         return pose_log, affinity.squeeze(-1)
 
 
+Model = namedtuple("Model", ["model", "affinity", "flex"])
+
+# Key: model name, affinity
 models_dict = {
-    ("default2017", False): Default2017Pose,
-    ("default2017", True): Default2017Affinity,
-    ("default2018", False): Default2018Pose,
-    ("default2018", True): Default2018Affinity,
-    ("dense", False): DensePose,
-    ("dense", True): DenseAffinity,
-    ("hires_pose", True): HiResPose,
-    ("hires_affinity", True): HiResAffinity,
+    Model("default2017", False, False): Default2017Pose,
+    Model("default2017", True, False): Default2017Affinity,
+    Model("default2017", False, True): Default2017Flex,
+    Model("default2018", False, False): Default2018Pose,
+    Model("default2018", True, False): Default2018Affinity,
+    Model("dense", False, False): DensePose,
+    Model("dense", True, False): DenseAffinity,
+    Model("hires_pose", True, False): HiResPose,
+    Model("hires_affinity", True, False): HiResAffinity,
 }

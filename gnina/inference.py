@@ -151,6 +151,7 @@ def inference(args):
         grid_maker=grid_maker,
         label_pos=args.label_pos,
         affinity_pos=args.affinity_pos,
+        flexlabel_pos=args.flexlabel_pos,
         random_translation=0.0,  # No random translations for inference
         random_rotation=False,  # No random rotations for inference
         device=device,
@@ -175,12 +176,16 @@ def inference(args):
     # Setup metrics but do not compute losses
     allmetrics = metrics.setup_metrics(
         affinity,
+        flex,
         pose_loss=None,
         affinity_loss=None,
+        flexpose_loss=None,
         roc_auc=args.roc_auc,
         device=device,
     )
-    evaluator = training._setup_evaluator(model, allmetrics, affinity=affinity)
+    evaluator = training._setup_evaluator(
+        model, allmetrics, affinity=affinity, flex=flex
+    )
 
     results = defaultdict(list)
 

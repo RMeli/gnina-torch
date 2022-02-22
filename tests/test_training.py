@@ -153,3 +153,34 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
     captured = capsys.readouterr()
     assert "Learning rate: 0.01" in captured.out  # Original (default) learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate
+
+
+def test_training_flexposepose(trainfile, dataroot, tmpdir, device):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfile,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "2",
+            "--test_every",
+            "2",
+            "--iterations",
+            "5",
+            "-o",
+            str(tmpdir),
+            "-g",
+            str(device),
+            "--seed",
+            "42",
+            "--label_pos",
+            "0",
+            "--flexlabel_pos",
+            "2",
+        ]
+    )
+
+    training.training(args)

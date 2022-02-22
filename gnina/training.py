@@ -330,8 +330,67 @@ def _train_step_pose_and_affinity(
     return loss.item()
 
 
+def _train_step_flex(
+    trainer: Engine,
+    batch,
+    model: nn.Module,
+    optimizer,
+    pose_loss: nn.Module,
+    flexpose_loss: nn.Module,
+    clip_gradients: float,
+) -> float:
+    """
+    Training step for pose prediction.
+
+    Parameters
+    ----------
+    trainer: Engine
+        PyTorch Ignite engine for training
+    batch:
+        Batch of data
+    model:
+        PyTorch model
+    optimizer:
+        PyTorch optimizer
+    pose_loss:
+        Loss function for pose prediction
+    flexpose_loss:
+        Loss function for flexible residues pose prediction
+    clip_gradients:
+        Gradient clipping threshold
+
+    Returns
+    -------
+    float
+        Loss
+
+    Notes
+    -----
+    Gradients are clipped by norm and not by value.
+    """
+    model.train()
+    optimizer.zero_grad()
+
+    # Data is already on the correct device thanks to the ExampleProvider
+    grids, labels, flexlabels = batch
+
+    pose_log, flexpose_log = model(grids)
+
+    # Compute loss for pose prediction
+    loss = pose_loss(pose_log, labels) + flexpose_loss(flexpose_log, flexlabels)
+
+    loss.backward()
+
+    # TODO: Double check that gradient clipping by norm corresponds to the Caffe
+    # implementation
+    nn.utils.clip_grad_norm_(model.parameters(), clip_gradients)
+    optimizer.step()
+
+    return loss.item()
+
+
 def _setup_trainer(
-    model, optimizer, pose_loss, affinity_loss, clip_gradients: float
+    model, optimizer, pose_loss, affinity_loss, flexpose_loss, clip_gradients: float
 ) -> Engine:
     """
     Setup training engine for binding pose prediction or binding pose and affinity
@@ -347,16 +406,28 @@ def _setup_trainer(
         Loss function for pose prediction
     affinity_loss:
         Loss function for affinity prediction
+    flexpose_loss:
+        Loss function for flexible residues pose prediction
     clip_gradients:
         Gradient clipping threshold
 
     Notes
     -----
-    If :code:`affinity_loss is Non e`, the model return both pose and affinity
-    predictions, which requites a custom training step to evaluate the combine loss
-    function. The custom training step is defined in
+    The arguments :code:`affinity_loss` and :code:`flexpose_loss` determine the type of
+    training to be performed.
+
+    If :code:`affinity_loss is not None`, multi-task learning on both the ligand pose
+    and the binding affinity is performed using the training function
     :fun:`_train_step_pose_and_affinity`.
+
+    If :code:`flexpose_loss is not None`, multi-task learning on both the ligand pose
+    and the pose of the flexible residues is performed using the training function
+    :fun:`_train_step_flex`.
     """
+    # Affinity prediction is currently incompatible with flexible residues pose
+    # prediction
+    assert affinity_loss is None or flexpose_loss is None
+
     if affinity_loss is not None:
         # Pose prediction and binding affinity prediction
         # Create engine based on custom train step
@@ -368,6 +439,20 @@ def _setup_trainer(
                 optimizer,
                 pose_loss=pose_loss,
                 affinity_loss=affinity_loss,
+                clip_gradients=clip_gradients,
+            )
+        )
+    elif flexpose_loss is not None:
+        # Ligand and flexible residues pose prediction
+        # Create engine based on custom train step
+        trainer = Engine(
+            lambda trainer, batch: _train_step_flex(
+                trainer,
+                batch,
+                model,
+                optimizer,
+                pose_loss=pose_loss,
+                flexpose_loss=flexpose_loss,
                 clip_gradients=clip_gradients,
             )
         )
@@ -469,7 +554,49 @@ def _evaluation_step_pose(evaluator: Engine, batch, model):
     return output
 
 
-def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
+def _evaluation_step_flex(evaluator: Engine, batch, model):
+    """
+    Evaluate model for ligand and flexible residues pose prediction.
+
+    Parameters
+    ----------
+    evaluator:
+        PyTorch Ignite :code:`Engine`
+    batch:
+        Batch data
+    model:
+        Model
+
+    Returns
+    -------
+    Tuple[torch.Tensor]
+        Class probabilities for pose prediction, class probabilities for flexible
+        residues pose prediction, true pose labels, and true flexible residues pose
+        labels
+
+    Notes
+    -----
+    The model returns the log softmax of the last linear layer for binding pose
+    prediction (log class probabilities).
+    """
+    model.eval()
+    with torch.no_grad():
+        grids, labels, flexlabels = batch
+        pose_log, flexpose_log = model(grids)
+
+    output = {
+        "pose_log": pose_log,
+        "flexpose_log": flexpose_log,
+        "labels": labels,
+        "flexlabels": flexlabels,
+    }
+
+    return output
+
+
+def _setup_evaluator(
+    model, metrics, affinity: bool = False, flex: bool = False
+) -> Engine:
     """
     Setup PyTorch Ignite :code:`Engine` for evaluation.
 
@@ -480,7 +607,10 @@ def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
     metrics:
         Evaluation metrics
     affinity: bool
-        Flag for affinity prediction (in addition to pose prediction)
+        Flag for affinity prediction (in addition to ligand pose prediction)
+    flex: bool
+        Flag for flexible residues pose prediction (in addition to ligand pose
+        prediction)
 
     Returns
     -------
@@ -490,15 +620,26 @@ def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
     Notes
     -----
     For pose prediction the model is rather standard (single outpout) and therefore
-    the :code:`create_supervised_evaluator()` factory function is used. For both pose
-    and binding affinity prediction, the custom
-    :code:`_evaluation_step_pose_and_affinity` is used instead.
+    the :fun:`create_supervised_evaluator()` factory function is used.
+
+    For both pose and binding affinity prediction, the custom
+    :fun:`_evaluation_step_pose_and_affinity` is used instead.
+
+    For both ligand and flexible residues pose prediction, the custom
+    :fun:`_evaluation_step_flex` is used instead.
+
     """
+    assert not (affinity and flex)
+
     if affinity:
         evaluator = Engine(
             lambda evaluator, batch: _evaluation_step_pose_and_affinity(
                 evaluator, batch, model
             )
+        )
+    elif flex:
+        evaluator = Engine(
+            lambda evaluator, batch: _evaluation_step_flex(evaluator, batch, model)
         )
     else:
         evaluator = Engine(
@@ -572,6 +713,7 @@ def training(args):
         grid_maker=grid_maker,
         label_pos=args.label_pos,
         affinity_pos=args.affinity_pos,
+        flexlabel_pos=args.flexlabel_pos,
         random_translation=args.random_translation,
         random_rotation=args.random_rotation,
         device=device,
@@ -583,6 +725,7 @@ def training(args):
             grid_maker=grid_maker,
             label_pos=args.label_pos,
             affinity_pos=args.affinity_pos,
+            flexlabel_pos=args.flexlabel_pos,
             random_translation=args.random_translation,
             random_rotation=args.random_rotation,
             device=device,
@@ -622,19 +765,21 @@ def training(args):
         if affinity
         else None
     )
+    flexpose_loss = torch.jit.script(nn.NLLLoss()) if flex else None
 
     trainer = _setup_trainer(
         model,
         optimizer,
         pose_loss=pose_loss,
         affinity_loss=affinity_loss,
+        flexpose_loss=flexpose_loss,
         clip_gradients=args.clip_gradients,
     )
 
     allmetrics = metrics.setup_metrics(
-        affinity, pose_loss, affinity_loss, args.roc_auc, device
+        affinity, flex, pose_loss, affinity_loss, flexpose_loss, args.roc_auc, device
     )
-    evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
+    evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
 
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):

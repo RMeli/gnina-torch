@@ -154,8 +154,8 @@ def setup_metrics(
 
         if flexpose_loss is not None:
             # For the loss function, log_softmax is needed as opposed to softmax
-            # Use transforms.output_transform_select_log_pose instead of
-            # transforms.output_transform_select_pose
+            # Use transforms.output_transform_select_log_flex instead of
+            # transforms.output_transform_select_flex
             m.update(
                 {
                     "Loss (flex pose)": metrics.Loss(

@@ -570,7 +570,7 @@ def _evaluation_step_flex(evaluator: Engine, batch, model):
     Returns
     -------
     Tuple[torch.Tensor]
-        Class probabilities for pose prediction, class probabilities for flexible
+        Log class probabilities for pose prediction, log class probabilities for flexible
         residues pose prediction, true pose labels, and true flexible residues pose
         labels
 
@@ -733,8 +733,8 @@ def training(args):
 
         assert test_loader.dims == train_loader.dims
 
-    affinity: bool = True if args.affinity_pos is not None else False
-    flex: bool = True if args.flexlabel_pos is not None else False
+    affinity: bool = args.affinity_pos is not None
+    flex: bool = args.flexlabel_pos is not None
 
     # Create model
     # Select model based on architecture and affinity flag (pose vs affinity)

@@ -157,8 +157,8 @@ def inference(args):
         device=device,
     )
 
-    affinity: bool = True if args.affinity_pos is not None else False
-    flex: bool = True if args.flexlabel_pos is not None else False
+    affinity: bool = args.affinity_pos is not None
+    flex: bool = args.flexlabel_pos is not None
 
     # Create model
     model = models.models_dict[(args.model, affinity, flex)](test_loader.dims).to(

@@ -38,7 +38,7 @@ def output_transform_select_log_pose(
     The output is not activated, i.e. the :code:`log_softmax` output is returned
     unchanged
     """
-    # Return pose class probabilities and true labels
+    # Return pose log class probabilities and true labels
     return output["pose_log"], output["labels"]
 
 
@@ -181,7 +181,7 @@ def output_transform_select_log_flex(
     The output is not activated, i.e. the :code:`log_softmax` output is returned
     unchanged
     """
-    # Return pose class probabilities and true labels
+    # Return pose log class probabilities and true labels
     return output["flexpose_log"], output["flexlabels"]
 
 

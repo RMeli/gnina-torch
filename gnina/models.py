@@ -238,7 +238,7 @@ class Default2017Affinity(Default2017Pose):
 
 class Default2017Flex(Default2017):
     """
-    GNINA default2017 model architecture for multi-task (MT) pose prediction (ligand and
+    GNINA default2017 model architecture for multi-task pose prediction (ligand and
     flexible residues).
 
     Poses are annotated based on both ligand RMSD and flexible residues RMSD (w.r.t. the

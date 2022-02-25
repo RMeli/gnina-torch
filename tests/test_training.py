@@ -140,9 +140,13 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
             "--seed",
             "42",
             "--progress_bar",
+            "--base_lr",
+            "0.1",
             "--lr_dynamic",
             "--lr_patience",
             "1",
+            "--lr_min",
+            "0.001",
         ]
     )
 
@@ -151,5 +155,6 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
     # Check that the learning rate changes during training
     # TODO: Store learning rate internally and check the cache instead
     captured = capsys.readouterr()
-    assert "Learning rate: 0.01" in captured.out  # Original (default) learning rate
+    assert "Learning rate: 0.1" in captured.out  # Initial learning rate
+    assert "Learning rate: 0.01" in captured.out  # Updated learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate

@@ -152,6 +152,18 @@ def setup_metrics(
             }
         )
 
+        if roc_auc:
+            m.update(
+                {
+                    "ROC AUC (flex)": ROC_AUC(
+                        output_transform=lambda output: transforms.output_transform_ROC_flex(
+                            output
+                        ),
+                        device=device,
+                    ),
+                }
+            )
+
         if flexpose_loss is not None:
             # For the loss function, log_softmax is needed as opposed to softmax
             # Use transforms.output_transform_select_log_flex instead of

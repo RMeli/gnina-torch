@@ -201,6 +201,9 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "--num_checkpoints", type=int, default=1, help="Number of checkpoints to keep"
     )
+    parser.add_argument(
+        "--checkpoint_prefix", type=str, default="", help="Checkpoint file prefix"
+    )
     parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
     # ROC AUC fails when there is only one class (i.e. all poses are good poses)
@@ -844,7 +847,7 @@ def training(args):
                 )
 
     # TODO: Save input parameters as well
-    # TODO: Save best models (lower loss)
+    # TODO: Save best models (lowest validation loss)
     to_save = {"model": model, "optimizer": optimizer}
     # Requires no checkpoint in the output directory
     # Since checkpoints are not automatically removed when restarting, it would be
@@ -852,6 +855,7 @@ def training(args):
     checkpoint = Checkpoint(
         to_save,
         args.out_dir,
+        filename_prefix=args.checkpoint_prefix,
         n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,
     )

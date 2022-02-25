@@ -627,18 +627,7 @@ def training(args):
     )
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
-    def log_training_results(trainer):
-        evaluator.run(train_loader)
-
-        for outstream in outstreams:
-            utils.log_print(
-                evaluator.state.metrics,
-                title="Train Results",
-                epoch=trainer.state.epoch,
-                stream=outstream,
-            )
-
+    # Define LR scheduler
     if args.lr_dynamic:
         torch_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
@@ -649,11 +638,24 @@ def training(args):
             verbose=False,
         )
 
-        # TODO: Define handle elsewhere and attach using input arguments
-        # TODO: Save lr history
-        # Event.COMPLETED since we want the full evaluation to be completed
-        @evaluator.on(Events.COMPLETED)
-        def scheduler(evaluator):
+    @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
+    def log_training_results(trainer):
+        """
+        Evaluate metrics on the training set and update the LR according to the loss
+        function, if needed.
+        """
+        evaluator.run(train_loader)
+
+        for outstream in outstreams:
+            utils.log_print(
+                evaluator.state.metrics,
+                title="Train Results",
+                epoch=trainer.state.epoch,
+                stream=outstream,
+            )
+
+        # Update LR based on the loss on the training set
+        if args.lr_dynamic:
             metrics = evaluator.state.metrics
 
             loss = metrics["Loss (pose)"]

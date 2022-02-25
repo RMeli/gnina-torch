@@ -704,9 +704,9 @@ class Dense(nn.Module):
         self.features_out_size = features[f"dense_block_{num_blocks-1}"].out_features()
 
         # Final spatial dimensions (pre-global pooling)
-        D = input_dims[1] // 2 ** num_blocks
-        H = input_dims[2] // 2 ** num_blocks
-        W = input_dims[3] // 2 ** num_blocks
+        D = input_dims[1] // 2**num_blocks
+        H = input_dims[2] // 2**num_blocks
+        W = input_dims[3] // 2**num_blocks
 
         # Global MAX pooling
         # Redices spatial dimension to a single number per channel

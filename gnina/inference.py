@@ -50,6 +50,9 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
+    parser.add_argument(
+        "--log_file", type=str, default="inference.log", help="Log file name"
+    )
 
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
@@ -119,7 +122,7 @@ def inference(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "inference.log"), "w")
+    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:

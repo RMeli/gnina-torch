@@ -89,6 +89,9 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
+    parser.add_argument(
+        "--log_file", type=str, default="training.log", help="Log file name"
+    )
 
     # Scoring function
     parser.add_argument(
@@ -154,7 +157,7 @@ def options(args: Optional[List[str]] = None):
         "--lr_reduce", type=float, default=0.1, help="Learning rate reduction factor"
     )
     # lr_min  default value set to match --step_end_cnt default value (3 reductions)
-    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
+    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1**3)
     parser.add_argument(
         "--clip_gradients",
         type=float,
@@ -677,7 +680,7 @@ def training(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "training.log"), "w")
+    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:

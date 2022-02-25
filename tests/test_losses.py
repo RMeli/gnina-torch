@@ -35,7 +35,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_sum(device):
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
     assert criterion(predicted, target).item() == pytest.approx(
-        100 * (np.sqrt(1.0 + diff ** 2) - 1.0)
+        100 * (np.sqrt(1.0 + diff**2) - 1.0)
     )
 
 
@@ -50,7 +50,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_mean_PH(device):
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
     # Divide by the lenght of the target to get mean loss
-    expected_loss = 100 * (np.sqrt(1.0 + diff ** 2) - 1.0) / len(target)
+    expected_loss = 100 * (np.sqrt(1.0 + diff**2) - 1.0) / len(target)
 
     assert criterion(predicted, target).item() == pytest.approx(expected_loss)
 
@@ -66,7 +66,7 @@ def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_PH(device):
     # Affinity is overestimated
     predicted = torch.tensor([0.0, 1.1, 2.2, 3.3 + diff, 4.4], device=device)
 
-    expected_loss = 100 * (np.sqrt(1.0 + diff ** 2) - 1.0)
+    expected_loss = 100 * (np.sqrt(1.0 + diff**2) - 1.0)
 
     assert criterion(predicted, target).item() == pytest.approx(expected_loss)
 
@@ -97,7 +97,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_mean_L2(device):
     # Affinity error with good pose
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
-    assert criterion(predicted, target).item() == pytest.approx(diff ** 2 / len(target))
+    assert criterion(predicted, target).item() == pytest.approx(diff**2 / len(target))
 
 
 def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_L2(device):
@@ -112,7 +112,7 @@ def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_L2(device):
     # Affinity is overestimated
     predicted = torch.tensor([0.0, 1.1, 2.2, 3.3 + diff, 4.4], device=device)
 
-    assert criterion(predicted, target).item() == pytest.approx(diff ** 2)
+    assert criterion(predicted, target).item() == pytest.approx(diff**2)
 
 
 def test_affinity_loss_underestimated_predicted_affinity_bad_pose_sum_L2(device):

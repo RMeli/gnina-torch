@@ -661,16 +661,16 @@ def training(args):
                 stream=outstream,
             )
 
-        metrics = evaluator.state.metrics
+        mts = evaluator.state.metrics
         metrics_train["Epoch"].append(trainer.state.epoch)
-        for key, value in metrics.items():
+        for key, value in mts.items():
             metrics_train[key].append(value)
 
         # Update LR based on the loss on the training set
         if args.lr_dynamic:
-            loss = metrics["Loss (pose)"]
+            loss = mts["Loss (pose)"]
             try:
-                loss += metrics["Loss (affinity)"]
+                loss += mts["Loss (affinity)"]
             except KeyError:
                 # No affinity loss
                 pass
@@ -698,9 +698,8 @@ def training(args):
                     stream=outstream,
                 )
 
-            metrics = evaluator.state.metrics
             metrics_test["Epoch"].append(trainer.state.epoch)
-            for key, value in metrics.items():
+            for key, value in evaluator.state.metrics.items():
                 metrics_test[key].append(value)
 
     # TODO: Save input parameters as well
@@ -731,7 +730,7 @@ def training(args):
 
     if args.testfile is not None:
         pd.DataFrame(metrics_test).to_csv(
-            os.path.join(args.out_dir, "metrics_test.csv", float_format="%.5f")
+            os.path.join(args.out_dir, "metrics_test.csv"), float_format="%.5f"
         )
 
     # Close log file

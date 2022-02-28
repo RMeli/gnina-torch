@@ -225,7 +225,7 @@ def inference(args):
             metrics_inference[key].append(value)
 
         pd.DataFrame(metrics_inference).to_csv(
-            os.path.join(args.out_dir, "metrics_inference.csv", float_format="%.5f")
+            os.path.join(args.out_dir, "metrics_inference.csv"), float_format="%.5f"
         )
 
     # Close log file

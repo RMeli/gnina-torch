@@ -55,7 +55,6 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
             "42",
             "--label_pos",
             "0",
-            "--csv",
         ]
     )
 
@@ -94,7 +93,6 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
             str(device),
             "--seed",
             "42",
-            "--csv",
         ]
     )
 

@@ -1,3 +1,6 @@
+import os
+
+import pandas as pd
 import pytest
 
 from gnina import training
@@ -54,6 +57,14 @@ def test_training(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
+    assert not os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))  # No test file
+
+    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
+    assert len(df_train) == 2
+
 
 def test_training_with_test(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
@@ -83,6 +94,17 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
     )
 
     training.training(args)
+
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+
+    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
+    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+
+    assert len(df_train) == 2
+    assert len(df_test) == 2
 
 
 def test_training_pose_and_affinity(trainfile, dataroot, tmpdir, device):
@@ -114,6 +136,14 @@ def test_training_pose_and_affinity(trainfile, dataroot, tmpdir, device):
     )
 
     training.training(args)
+
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
+    assert not os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+
+    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
+    assert len(df_train) == 2
 
 
 def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
@@ -158,3 +188,14 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
     assert "Learning rate: 0.1" in captured.out  # Initial learning rate
     assert "Learning rate: 0.01" in captured.out  # Updated learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate
+
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+
+    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
+    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+
+    assert len(df_train) == 5
+    assert len(df_test) == 5

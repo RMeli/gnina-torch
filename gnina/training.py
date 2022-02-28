@@ -5,10 +5,12 @@ PyTorch implementation of GNINA scoring function's Caffe training script.
 import argparse
 import os
 import sys
+from collections import defaultdict
 from typing import List, Optional
 
 import molgrid
 import numpy as np
+import pandas as pd
 import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events
@@ -625,6 +627,11 @@ def training(args):
     allmetrics = metrics.setup_metrics(
         affinity, pose_loss, affinity_loss, args.roc_auc, device
     )
+
+    # Storage for metrics
+    metrics_train = defaultdict(list)
+    metrics_test = defaultdict(list)
+
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
 
     # Define LR scheduler
@@ -654,10 +661,13 @@ def training(args):
                 stream=outstream,
             )
 
+        metrics = evaluator.state.metrics
+        metrics_train["Epoch"].append(trainer.state.epoch)
+        for key, value in metrics.items():
+            metrics_train[key].append(value)
+
         # Update LR based on the loss on the training set
         if args.lr_dynamic:
-            metrics = evaluator.state.metrics
-
             loss = metrics["Loss (pose)"]
             try:
                 loss += metrics["Loss (affinity)"]
@@ -688,6 +698,11 @@ def training(args):
                     stream=outstream,
                 )
 
+            metrics = evaluator.state.metrics
+            metrics_test["Epoch"].append(trainer.state.epoch)
+            for key, value in metrics.items():
+                metrics_test[key].append(value)
+
     # TODO: Save input parameters as well
     # TODO: Save best models (lower loss)
     to_save = {"model": model, "optimizer": optimizer}
@@ -709,6 +724,13 @@ def training(args):
         pbar.attach(trainer)
 
     trainer.run(train_loader, max_epochs=args.iterations)
+
+    pd.DataFrame(metrics_train).to_csv(os.path.join(args.out_dir, "metrics_train.csv"))
+
+    if args.testfile is not None:
+        pd.DataFrame(metrics_test).to_csv(
+            os.path.join(args.out_dir, "metrics_test.csv")
+        )
 
     # Close log file
     logfile.close()

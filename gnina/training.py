@@ -891,15 +891,18 @@ def training(args):
 
     trainer.run(train_loader, max_epochs=args.iterations)
 
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
+
     pd.DataFrame(metrics_train).to_csv(
-        os.path.join(args.out_dir, "metrics_train.csv"),
+        os.path.join(args.out_dir, f"{log_root}_metrics_train.csv"),
         float_format="%.5f",
         index=False,
     )
 
     if args.testfile is not None:
         pd.DataFrame(metrics_test).to_csv(
-            os.path.join(args.out_dir, "metrics_test.csv"),
+            os.path.join(args.out_dir, f"{log_root}_metrics_test.csv"),
             float_format="%.5f",
             index=False,
         )

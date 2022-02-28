@@ -57,12 +57,15 @@ def test_training(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
     # Check presence of output files
     assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
-    assert not os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))  # No test file
+    assert os.path.isfile(fname_train_metrics)
+    assert not os.path.isfile(fname_test_metrics)
 
-    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
+    df_train = pd.read_csv(fname_train_metrics)
     assert len(df_train) == 2
 
 
@@ -95,13 +98,16 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
     # Check presence of output files
     assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
 
-    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
-    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
 
     assert len(df_train) == 2
     assert len(df_test) == 2
@@ -139,13 +145,16 @@ def test_training_pose_and_affinity_with_test(trainfile, dataroot, tmpdir, devic
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
     # Check presence of output files
     assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
 
-    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
-    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
 
     assert len(df_train) == 2
     assert len(df_test) == 2
@@ -194,13 +203,16 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
     assert "Learning rate: 0.01" in captured.out  # Updated learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
     # Check presence of output files
     assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
 
-    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
-    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
 
     assert len(df_train) == 5
     assert len(df_test) == 5
@@ -238,13 +250,16 @@ def test_training_flexposepose_with_test(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
     # Check presence of output files
     assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_train.csv"))
-    assert os.path.isfile(os.path.join(tmpdir, "metrics_test.csv"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
 
-    df_train = pd.read_csv(os.path.join(tmpdir, "metrics_train.csv"))
-    df_test = pd.read_csv(os.path.join(tmpdir, "metrics_test.csv"))
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
 
     assert len(df_train) == 2
     assert len(df_test) == 2

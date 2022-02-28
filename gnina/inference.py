@@ -235,16 +235,20 @@ def inference(args):
             stream=outstream,
         )
 
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
+
     if args.csv:
         pd.DataFrame(results).to_csv(
-            os.path.join(args.out_dir, "inference.csv"), float_format="%.5f"
+            os.path.join(args.out_dir, f"{log_root}_results.csv"),
+            float_format="%.5f",
         )
 
         for key, value in evaluator.state.metrics.items():
             metrics_inference[key].append(value)
 
         pd.DataFrame(metrics_inference).to_csv(
-            os.path.join(args.out_dir, "metrics_inference.csv"),
+            os.path.join(args.out_dir, f"{log_root}_metrics.csv"),
             float_format="%.5f",
             index=False,
         )

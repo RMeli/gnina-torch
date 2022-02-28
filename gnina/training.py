@@ -725,11 +725,13 @@ def training(args):
 
     trainer.run(train_loader, max_epochs=args.iterations)
 
-    pd.DataFrame(metrics_train).to_csv(os.path.join(args.out_dir, "metrics_train.csv"))
+    pd.DataFrame(metrics_train).to_csv(
+        os.path.join(args.out_dir, "metrics_train.csv"), float_format="%.5f"
+    )
 
     if args.testfile is not None:
         pd.DataFrame(metrics_test).to_csv(
-            os.path.join(args.out_dir, "metrics_test.csv")
+            os.path.join(args.out_dir, "metrics_test.csv", float_format="%.5f")
         )
 
     # Close log file

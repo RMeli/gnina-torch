@@ -172,6 +172,7 @@ def inference(args):
     evaluator = training._setup_evaluator(model, allmetrics, affinity=affinity)
 
     results = defaultdict(list)
+    metrics_inference = defaultdict(list)
 
     # Print predictions for every batch
     # evaluator.state.output only stores the last batch
@@ -215,10 +216,17 @@ def inference(args):
             stream=outstream,
         )
 
-    df = pd.DataFrame(results)
-
     if args.csv:
-        df.to_csv(os.path.join(args.out_dir, "inference.csv"), float_format="%.5f")
+        pd.DataFrame(results).to_csv(
+            os.path.join(args.out_dir, "inference.csv"), float_format="%.5f"
+        )
+
+        for key, value in evaluator.state.metrics.items():
+            metrics_inference[key].append(value)
+
+        pd.DataFrame(metrics_inference).to_csv(
+            os.path.join(args.out_dir, "metrics_inference.csv", float_format="%.5f")
+        )
 
     # Close log file
     logfile.close()

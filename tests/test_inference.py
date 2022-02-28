@@ -55,10 +55,15 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
             "42",
             "--label_pos",
             "0",
+            "--csv",
         ]
     )
 
     inference.inference(args)
+
+    # Confirm inference output files exist
+    assert os.path.isfile(os.path.join(tmpdir, "inference.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_inference.csv"))
 
 
 def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
@@ -89,6 +94,7 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
             str(device),
             "--seed",
             "42",
+            "--csv",
         ]
     )
 
@@ -121,3 +127,7 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
     )
 
     inference.inference(args)
+
+    # Confirm inference output files exist
+    assert os.path.isfile(os.path.join(tmpdir, "inference.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "metrics_inference.csv"))

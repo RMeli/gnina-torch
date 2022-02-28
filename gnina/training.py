@@ -658,6 +658,7 @@ def training(args):
                 evaluator.state.metrics,
                 title="Train Results",
                 epoch=trainer.state.epoch,
+                time=trainer.state.times["EPOCH_COMPLETED"],
                 stream=outstream,
             )
 

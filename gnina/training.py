@@ -14,7 +14,7 @@ import pandas as pd
 import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events
-from ignite.handlers import Checkpoint
+from ignite.handlers import Checkpoint, timing
 from torch import nn, optim
 
 from gnina import metrics, setup, utils
@@ -645,6 +645,16 @@ def training(args):
             verbose=False,
         )
 
+    # Elapsed time timer, training time only
+    elapsed_time = timing.Timer()
+    elapsed_time.attach(
+        trainer,
+        start=Events.STARTED,
+        resume=Events.EPOCH_STARTED,
+        pause=Events.EPOCH_COMPLETED,
+        step=Events.EPOCH_COMPLETED,
+    )
+
     @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
     def log_training_results(trainer):
         """
@@ -658,6 +668,8 @@ def training(args):
                 evaluator.state.metrics,
                 title="Train Results",
                 epoch=trainer.state.epoch,
+                epoch_time=trainer.state.times["EPOCH_COMPLETED"],
+                elapsed_time=elapsed_time.total,
                 stream=outstream,
             )
 

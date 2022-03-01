@@ -37,6 +37,8 @@ def log_print(
     metrics,
     title: Optional[str] = None,
     epoch: Optional[int] = None,
+    epoch_time: Optional[float] = None,
+    elapsed_time: Optional[float] = None,
     stream=sys.stdout,
 ):
     """
@@ -68,6 +70,14 @@ def log_print(
 
     if loss > 0:
         print(f"    Loss: {loss:.5f}", file=stream)
+
+    if epoch_time is not None:
+        print(f"{indent}Time (epoch): {epoch_time:.5f}", file=stream, flush=True)
+
+    if elapsed_time is not None:
+        print(f"{indent}Time (elapsed): {elapsed_time:.5f}", file=stream, flush=True)
+
+    # Flush stream
     print("", end="", file=stream, flush=True)
 
 

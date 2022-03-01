@@ -645,6 +645,7 @@ def training(args):
             verbose=False,
         )
 
+    # Elapsed time timer, training time only
     elapsed_time = timing.Timer()
     elapsed_time.attach(
         trainer,

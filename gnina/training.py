@@ -93,7 +93,7 @@ def options(args: Optional[List[str]] = None):
         type=str,
         default="default2017",
         help="Model name",
-        choices=[k[0] for k in models_dict.keys()],  # Model names
+        choices=set([k[0] for k in models_dict.keys()]),  # Model names
     )
     parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
     parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")

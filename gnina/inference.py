@@ -29,7 +29,12 @@ def options(args: Optional[List[str]] = None):
     )
 
     parser.add_argument("input", type=str, help="Input file for inference")
-    parser.add_argument("model", type=str, help="Model")
+    parser.add_argument(
+        "model",
+        type=str,
+        help="Model",
+        choices=set([k[0] for k in models.models_dict.keys()]),
+    )
     parser.add_argument("checkpoint", type=str, help="Checkpoint file")
 
     parser.add_argument(

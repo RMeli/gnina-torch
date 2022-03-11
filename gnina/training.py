@@ -77,6 +77,30 @@ def options(args: Optional[List[str]] = None):
         help="Sample uniformly across receptors",
     )
     parser.add_argument(
+        "--stratify_pos",
+        type=int,
+        default=1,
+        help="Sample uniformly across bins",
+    )
+    parser.add_argument(
+        "--stratify_max",
+        type=float,
+        default=0,
+        help="Maximum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_min",
+        type=float,
+        default=0,
+        help="Minimum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_step",
+        type=float,
+        default=0,
+        help="Step size for value stratification",
+    )
+    parser.add_argument(
         "--ligmolcache",
         type=str,
         default="",
@@ -159,7 +183,7 @@ def options(args: Optional[List[str]] = None):
         "--lr_reduce", type=float, default=0.1, help="Learning rate reduction factor"
     )
     # lr_min  default value set to match --step_end_cnt default value (3 reductions)
-    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
+    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1**3)
     parser.add_argument(
         "--clip_gradients",
         type=float,

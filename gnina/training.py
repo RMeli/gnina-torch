@@ -19,7 +19,7 @@ from torch import nn, optim
 
 from gnina import metrics, setup, utils
 from gnina.dataloaders import GriddedExamplesLoader
-from gnina.losses import AffinityLoss
+from gnina.losses import AffinityLoss, ScaledNLLLoss
 from gnina.models import models_dict, weights_and_biases_init
 
 
@@ -212,6 +212,18 @@ def options(args: Optional[List[str]] = None):
         type=float,
         default=1.0,
         help="Penalty for affinity loss",
+    )
+    parser.add_argument(
+        "--scale_pose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for pose loss",
+    )
+    parser.add_argument(
+        "--scale_flexpose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for flexible residues pose loss",
     )
 
     # Misc
@@ -784,7 +796,7 @@ def training(args):
     )
 
     # Define loss functions
-    pose_loss = torch.jit.script(nn.NLLLoss())
+    pose_loss = torch.jit.script(ScaledNLLLoss(scale=args.scale_pose_loss))
     affinity_loss = (
         torch.jit.script(
             AffinityLoss(
@@ -797,7 +809,11 @@ def training(args):
         if affinity
         else None
     )
-    flexpose_loss = torch.jit.script(nn.NLLLoss()) if flex else None
+    flexpose_loss = (
+        torch.jit.script(ScaledNLLLoss(scale=args.scale_flexpose_loss))
+        if flex
+        else None
+    )
 
     trainer = _setup_trainer(
         model,

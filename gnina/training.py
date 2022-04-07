@@ -242,6 +242,12 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "--checkpoint_prefix", type=str, default="", help="Checkpoint file prefix"
     )
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        default="",
+        help="Checkpoint directory (appended to output directory)",
+    )
     parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
     # ROC AUC fails when there is only one class (i.e. all poses are good poses)
@@ -928,7 +934,7 @@ def training(args):
     # dangerous to run without requiring the directory to have no previous checkpoints
     checkpoint = Checkpoint(
         to_save,
-        args.out_dir,
+        os.path.join(args.out_dir, args.checkpoint_dir),
         filename_prefix=args.checkpoint_prefix,
         n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,

@@ -163,6 +163,11 @@ class Default2017Pose(Default2017):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -218,6 +223,11 @@ class Default2017Affinity(Default2017Pose):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
 
         Notes
         -----
@@ -284,6 +294,11 @@ class Default2017Flex(Default2017):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and flexible residues pose prediction
 
         Returns
         -------
@@ -454,6 +469,11 @@ class Default2018Pose(Default2018):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -508,6 +528,11 @@ class Default2018Affinity(Default2018Pose):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
 
         Notes
         -----
@@ -664,6 +689,11 @@ class DenseBlock(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor
         """
 
         # TODO: Make more efficient by keeping concatenated outputs
@@ -798,6 +828,14 @@ class Dense(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Raises
+        ------
+        NotImplementedError
+
+        Notes
+        -----
+        The forward pass needs to be implemented in derived classes.
         """
         raise NotImplementedError
 
@@ -856,6 +894,11 @@ class DensePose(Dense):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
 
         Notes
         -----
@@ -927,6 +970,11 @@ class DenseAffinity(DensePose):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
 
         Notes
         -----
@@ -1150,6 +1198,11 @@ class HiResPose(nn.Module):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -1281,6 +1334,11 @@ class HiResAffinity(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
 
         Notes
         -----

@@ -1,9 +1,7 @@
 name: gninatorch
 channels:
-  - conda-forge
-  - defaults
   - pytorch
-  - nvidia
+  - conda-forge
 dependencies:
   - python
   - pip
@@ -13,10 +11,12 @@ dependencies:
   - scipy
   - pandas
 
-  - pytorch=1.9
+  - cudatoolkit=11.3
+  - pytorch=1.11
   - ignite
   - torchvision
-  - cudatoolkit=11.1
+
+  - mlflow
 
   - scikit-learn>=1.0
 
@@ -25,6 +25,7 @@ dependencies:
   - pip:
     - molgrid
 
+  # devtools
   - pytest
   - pytest-cov
   - codecov
@@ -32,3 +33,4 @@ dependencies:
   - mypy
   - flake8
   - isort
+  - pre-commit

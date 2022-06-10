@@ -124,3 +124,6 @@ examples/Francoeur2020/PDBbind2016*/*
 !examples/Francoeur2020/PDBbind2016*/assets/
 
 nohup.out
+
+# ML Tracking
+mlruns/

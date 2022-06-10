@@ -72,7 +72,7 @@ def setup_metrics(
         # transforms.output_transform_select_pose
         m.update(
             {
-                "Loss - Pose": metrics.Loss(
+                "Pose Loss": metrics.Loss(
                     pose_loss,
                     output_transform=transforms.output_transform_select_log_pose,
                 )
@@ -111,7 +111,7 @@ def setup_metrics(
             # The loss function uses the sign to distinguish good from bad poses
             m.update(
                 {
-                    "Loss - Affinity": metrics.Loss(
+                    "Affinity Loss": metrics.Loss(
                         affinity_loss,
                         output_transform=transforms.output_transform_select_affinity,
                     )

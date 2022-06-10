@@ -717,12 +717,9 @@ def training(args):
 
         # Update LR based on the loss on the training set
         if args.lr_dynamic:
-            loss = mts["Loss - Pose"]
-            try:
-                loss += mts["Loss (affinity)"]
-            except KeyError:
-                # No affinity loss
-                pass
+            loss = mts["Pose Loss"]
+            if affinity:
+                loss += mts["Affinity Loss"]
 
             torch_scheduler.step(loss)
 

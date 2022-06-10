@@ -170,6 +170,8 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
                 "1",
                 "--iterations",
                 "5",
+                "--affinity_pos",
+                "1",
                 "-o",
                 str(tmpdir),
                 "-g",

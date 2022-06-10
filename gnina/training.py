@@ -525,7 +525,8 @@ def training(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "training.log"), "w")
+    logfilename = os.path.join(args.out_dir, "training.log")
+    logfile = open(logfilename, "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:
@@ -750,6 +751,7 @@ def training(args):
             for key, value in test_evaluator.state.metrics.items():
                 metrics_test[key].append(value)
 
+    # TODO: Add checkpoints as artifacts to MLflow
     # TODO: Save input parameters as well
     # TODO: Save best models (lower loss)
     to_save = {"model": model, "optimizer": optimizer}
@@ -772,21 +774,26 @@ def training(args):
 
     trainer.run(train_loader, max_epochs=args.iterations)
 
+    metrics_train_outfile = os.path.join(args.out_dir, "metrics_train.csv")
     pd.DataFrame(metrics_train).to_csv(
-        os.path.join(args.out_dir, "metrics_train.csv"),
+        metrics_train_outfile,
         float_format="%.5f",
         index=False,
     )
+    mlflogger.log_artifact(metrics_train_outfile)
 
     if args.testfile is not None:
+        metrics_test_outfile = os.path.join(args.out_dir, "metrics_test.csv")
         pd.DataFrame(metrics_test).to_csv(
-            os.path.join(args.out_dir, "metrics_test.csv"),
+            metrics_test_outfile,
             float_format="%.5f",
             index=False,
         )
+        mlflogger.log_artifact(metrics_test_outfile)
 
-    # Close log file
+    # Close log file and save as artifact
     logfile.close()
+    mlflogger.log_artifact(logfilename)
 
 
 if __name__ == "__main__":

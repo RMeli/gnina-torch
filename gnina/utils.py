@@ -72,10 +72,10 @@ def log_print(
         print(f"    Loss: {loss:.5f}", file=stream)
 
     if epoch_time is not None:
-        print(f"{indent}Time (epoch): {epoch_time:.5f}", file=stream, flush=True)
+        print(f"{indent}Time - Epoch: {epoch_time:.5f}", file=stream, flush=True)
 
     if elapsed_time is not None:
-        print(f"{indent}Time (elapsed): {elapsed_time:.5f}", file=stream, flush=True)
+        print(f"{indent}Time - Elapsed: {elapsed_time:.5f}", file=stream, flush=True)
 
     # Flush stream
     print("", end="", file=stream, flush=True)

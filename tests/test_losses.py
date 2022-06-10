@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 import torch
+from torch import nn
 
 from gnina import losses
 
@@ -35,7 +36,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_sum(device):
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
     assert criterion(predicted, target).item() == pytest.approx(
-        100 * (np.sqrt(1.0 + diff ** 2) - 1.0)
+        100 * (np.sqrt(1.0 + diff**2) - 1.0)
     )
 
 
@@ -50,7 +51,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_mean_PH(device):
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
     # Divide by the lenght of the target to get mean loss
-    expected_loss = 100 * (np.sqrt(1.0 + diff ** 2) - 1.0) / len(target)
+    expected_loss = 100 * (np.sqrt(1.0 + diff**2) - 1.0) / len(target)
 
     assert criterion(predicted, target).item() == pytest.approx(expected_loss)
 
@@ -66,7 +67,7 @@ def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_PH(device):
     # Affinity is overestimated
     predicted = torch.tensor([0.0, 1.1, 2.2, 3.3 + diff, 4.4], device=device)
 
-    expected_loss = 100 * (np.sqrt(1.0 + diff ** 2) - 1.0)
+    expected_loss = 100 * (np.sqrt(1.0 + diff**2) - 1.0)
 
     assert criterion(predicted, target).item() == pytest.approx(expected_loss)
 
@@ -97,7 +98,7 @@ def test_affinity_loss_wrong_predicted_affinity_good_pose_mean_L2(device):
     # Affinity error with good pose
     predicted = torch.tensor([0.0, 1.1 + diff, 2.2, 3.3, 4.4], device=device)
 
-    assert criterion(predicted, target).item() == pytest.approx(diff ** 2 / len(target))
+    assert criterion(predicted, target).item() == pytest.approx(diff**2 / len(target))
 
 
 def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_L2(device):
@@ -112,7 +113,7 @@ def test_affinity_loss_overestimated_predicted_affinity_bad_pose_sum_L2(device):
     # Affinity is overestimated
     predicted = torch.tensor([0.0, 1.1, 2.2, 3.3 + diff, 4.4], device=device)
 
-    assert criterion(predicted, target).item() == pytest.approx(diff ** 2)
+    assert criterion(predicted, target).item() == pytest.approx(diff**2)
 
 
 def test_affinity_loss_underestimated_predicted_affinity_bad_pose_sum_L2(device):
@@ -129,3 +130,27 @@ def test_affinity_loss_underestimated_predicted_affinity_bad_pose_sum_L2(device)
 
     # Underestimated affinity for a bad pose does not contribute to the loss
     assert criterion(predicted, target).item() == pytest.approx(0.0)
+
+
+def test_nllloss_scaled_null(device):
+    criterion = losses.ScaledNLLLoss()
+
+    tt = torch.tensor([0, 0, 1, 1, 0], device=device)
+    it = torch.tensor(
+        [[0.0, 1.0], [0.0, 1.0], [1.0, 0.0], [0.1, 0.0], [0.0, 1.0]], device=device
+    )
+    assert criterion(it, tt).item() == pytest.approx(0.0)
+
+
+def test_nllloss_scaled(device):
+    scale = 0.5
+
+    loss = losses.ScaledNLLLoss(scale=0.5)
+    unscaled_loss = nn.NLLLoss()
+
+    tt = torch.tensor([0, 0, 1, 1, 0], device=device)
+    it = torch.tensor(
+        [[0.9, 0.1], [0.2, 0.8], [0.7, 0.3], [0.2, 0.8], [0.2, 0.8]], device=device
+    )
+
+    assert loss(it, tt).item() == pytest.approx(scale * unscaled_loss(it, tt).item())

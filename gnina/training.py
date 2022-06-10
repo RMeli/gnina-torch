@@ -5,19 +5,21 @@ PyTorch implementation of GNINA scoring function's Caffe training script.
 import argparse
 import os
 import sys
+from collections import defaultdict
 from typing import List, Optional
 
 import molgrid
 import numpy as np
+import pandas as pd
 import torch
 from ignite.contrib.handlers import ProgressBar
 from ignite.engine import Engine, Events
-from ignite.handlers import Checkpoint
+from ignite.handlers import Checkpoint, timing
 from torch import nn, optim
 
 from gnina import metrics, setup, utils
 from gnina.dataloaders import GriddedExamplesLoader
-from gnina.losses import AffinityLoss
+from gnina.losses import AffinityLoss, ScaledNLLLoss
 from gnina.models import models_dict, weights_and_biases_init
 
 
@@ -75,6 +77,30 @@ def options(args: Optional[List[str]] = None):
         help="Sample uniformly across receptors",
     )
     parser.add_argument(
+        "--stratify_pos",
+        type=int,
+        default=1,
+        help="Sample uniformly across bins",
+    )
+    parser.add_argument(
+        "--stratify_max",
+        type=float,
+        default=0,
+        help="Maximum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_min",
+        type=float,
+        default=0,
+        help="Minimum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_step",
+        type=float,
+        default=0,
+        help="Step size for value stratification",
+    )
+    parser.add_argument(
         "--ligmolcache",
         type=str,
         default="",
@@ -89,6 +115,9 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
     )
+    parser.add_argument(
+        "--log_file", type=str, default="training.log", help="Log file name"
+    )
 
     # Scoring function
     parser.add_argument(
@@ -97,7 +126,7 @@ def options(args: Optional[List[str]] = None):
         type=str,
         default="default2017",
         help="Model name",
-        choices=[k[0] for k in models_dict.keys()],  # Model names
+        choices=set([k[0] for k in models_dict.keys()]),  # Model names
     )
     parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
     parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
@@ -154,7 +183,7 @@ def options(args: Optional[List[str]] = None):
         "--lr_reduce", type=float, default=0.1, help="Learning rate reduction factor"
     )
     # lr_min  default value set to match --step_end_cnt default value (3 reductions)
-    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1 ** 3)
+    parser.add_argument("--lr_min", type=float, default=0.01 * 0.1**3)
     parser.add_argument(
         "--clip_gradients",
         type=float,
@@ -184,6 +213,18 @@ def options(args: Optional[List[str]] = None):
         default=1.0,
         help="Penalty for affinity loss",
     )
+    parser.add_argument(
+        "--scale_pose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for pose loss",
+    )
+    parser.add_argument(
+        "--scale_flexpose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for flexible residues pose loss",
+    )
 
     # Misc
     parser.add_argument(
@@ -197,6 +238,15 @@ def options(args: Optional[List[str]] = None):
     )
     parser.add_argument(
         "--num_checkpoints", type=int, default=1, help="Number of checkpoints to keep"
+    )
+    parser.add_argument(
+        "--checkpoint_prefix", type=str, default="", help="Checkpoint file prefix"
+    )
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        default="",
+        help="Checkpoint directory (appended to output directory)",
     )
     parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
@@ -677,7 +727,7 @@ def training(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "training.log"), "w")
+    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:
@@ -752,7 +802,7 @@ def training(args):
     )
 
     # Define loss functions
-    pose_loss = torch.jit.script(nn.NLLLoss())
+    pose_loss = torch.jit.script(ScaledNLLLoss(scale=args.scale_pose_loss))
     affinity_loss = (
         torch.jit.script(
             AffinityLoss(
@@ -765,7 +815,11 @@ def training(args):
         if affinity
         else None
     )
-    flexpose_loss = torch.jit.script(nn.NLLLoss()) if flex else None
+    flexpose_loss = (
+        torch.jit.script(ScaledNLLLoss(scale=args.scale_flexpose_loss))
+        if flex
+        else None
+    )
 
     trainer = _setup_trainer(
         model,
@@ -779,20 +833,14 @@ def training(args):
     allmetrics = metrics.setup_metrics(
         affinity, flex, pose_loss, affinity_loss, flexpose_loss, args.roc_auc, device
     )
+
+    # Storage for metrics
+    metrics_train = defaultdict(list)
+    metrics_test = defaultdict(list)
+
     evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
 
-    @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
-    def log_training_results(trainer):
-        evaluator.run(train_loader)
-
-        for outstream in outstreams:
-            utils.log_print(
-                evaluator.state.metrics,
-                title="Train Results",
-                epoch=trainer.state.epoch,
-                stream=outstream,
-            )
-
+    # Define LR scheduler
     if args.lr_dynamic:
         torch_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
@@ -803,18 +851,52 @@ def training(args):
             verbose=False,
         )
 
-        # TODO: Define handle elsewhere and attach using input arguments
-        # TODO: Save lr history
-        # Event.COMPLETED since we want the full evaluation to be completed
-        @evaluator.on(Events.COMPLETED)
-        def scheduler(evaluator):
-            metrics = evaluator.state.metrics
+    # Elapsed time timer, training time only
+    elapsed_time = timing.Timer()
+    elapsed_time.attach(
+        trainer,
+        start=Events.STARTED,
+        resume=Events.EPOCH_STARTED,
+        pause=Events.EPOCH_COMPLETED,
+        step=Events.EPOCH_COMPLETED,
+    )
 
-            loss = metrics["Loss (pose)"]
+    @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
+    def log_training_results(trainer):
+        """
+        Evaluate metrics on the training set and update the LR according to the loss
+        function, if needed.
+        """
+        evaluator.run(train_loader)
+
+        for outstream in outstreams:
+            utils.log_print(
+                evaluator.state.metrics,
+                title="Train Results",
+                epoch=trainer.state.epoch,
+                epoch_time=trainer.state.times["EPOCH_COMPLETED"],
+                elapsed_time=elapsed_time.total,
+                stream=outstream,
+            )
+
+        mts = evaluator.state.metrics
+        metrics_train["Epoch"].append(trainer.state.epoch)
+        for key, value in mts.items():
+            metrics_train[key].append(value)
+
+        # Update LR based on the loss on the training set
+        if args.lr_dynamic:
+            loss = mts["Loss (pose)"]
+
             try:
-                loss += metrics["Loss (affinity)"]
+                loss += mts["Loss (affinity)"]
             except KeyError:
                 # No affinity loss
+                pass
+            try:
+                loss += mts["Loss (flex pose)"]
+            except KeyError:
+                # No flexible residues pose loss
                 pass
 
             torch_scheduler.step(loss)
@@ -840,15 +922,20 @@ def training(args):
                     stream=outstream,
                 )
 
+            metrics_test["Epoch"].append(trainer.state.epoch)
+            for key, value in evaluator.state.metrics.items():
+                metrics_test[key].append(value)
+
     # TODO: Save input parameters as well
-    # TODO: Save best models (lower loss)
+    # TODO: Save best models (lowest validation loss)
     to_save = {"model": model, "optimizer": optimizer}
     # Requires no checkpoint in the output directory
     # Since checkpoints are not automatically removed when restarting, it would be
     # dangerous to run without requiring the directory to have no previous checkpoints
     checkpoint = Checkpoint(
         to_save,
-        args.out_dir,
+        os.path.join(args.out_dir, args.checkpoint_dir),
+        filename_prefix=args.checkpoint_prefix,
         n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,
     )
@@ -861,6 +948,22 @@ def training(args):
         pbar.attach(trainer)
 
     trainer.run(train_loader, max_epochs=args.iterations)
+
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
+
+    pd.DataFrame(metrics_train).to_csv(
+        os.path.join(args.out_dir, f"{log_root}_metrics_train.csv"),
+        float_format="%.5f",
+        index=False,
+    )
+
+    if args.testfile is not None:
+        pd.DataFrame(metrics_test).to_csv(
+            os.path.join(args.out_dir, f"{log_root}_metrics_test.csv"),
+            float_format="%.5f",
+            index=False,
+        )
 
     # Close log file
     logfile.close()

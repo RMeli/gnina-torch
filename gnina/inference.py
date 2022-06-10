@@ -29,7 +29,12 @@ def options(args: Optional[List[str]] = None):
     )
 
     parser.add_argument("input", type=str, help="Input file for inference")
-    parser.add_argument("model", type=str, help="Model")
+    parser.add_argument(
+        "model",
+        type=str,
+        help="Model",
+        choices=set([k[0] for k in models.models_dict.keys()]),
+    )
     parser.add_argument("checkpoint", type=str, help="Checkpoint file")
 
     parser.add_argument(
@@ -49,6 +54,9 @@ def options(args: Optional[List[str]] = None):
 
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
+    )
+    parser.add_argument(
+        "--log_file", type=str, default="inference.log", help="Log file name"
     )
 
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
@@ -119,7 +127,7 @@ def inference(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "inference.log"), "w")
+    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:
@@ -188,6 +196,7 @@ def inference(args):
     )
 
     results = defaultdict(list)
+    metrics_inference = defaultdict(list)
 
     # Print predictions for every batch
     # evaluator.state.output only stores the last batch
@@ -231,10 +240,23 @@ def inference(args):
             stream=outstream,
         )
 
-    df = pd.DataFrame(results)
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
 
     if args.csv:
-        df.to_csv(os.path.join(args.out_dir, "inference.csv"), float_format="%.5f")
+        pd.DataFrame(results).to_csv(
+            os.path.join(args.out_dir, f"{log_root}_results.csv"),
+            float_format="%.5f",
+        )
+
+        for key, value in evaluator.state.metrics.items():
+            metrics_inference[key].append(value)
+
+        pd.DataFrame(metrics_inference).to_csv(
+            os.path.join(args.out_dir, f"{log_root}_metrics.csv"),
+            float_format="%.5f",
+            index=False,
+        )
 
     # Close log file
     logfile.close()

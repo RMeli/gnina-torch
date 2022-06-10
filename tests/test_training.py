@@ -1,3 +1,6 @@
+import os
+
+import pandas as pd
 import pytest
 
 from gnina import training
@@ -54,6 +57,17 @@ def test_training(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(fname_train_metrics)
+    assert not os.path.isfile(fname_test_metrics)
+
+    df_train = pd.read_csv(fname_train_metrics)
+    assert len(df_train) == 2
+
 
 def test_training_with_test(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
@@ -84,12 +98,28 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
 
-def test_training_pose_and_affinity(trainfile, dataroot, tmpdir, device):
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
+
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
+
+    assert len(df_train) == 2
+    assert len(df_test) == 2
+
+
+def test_training_pose_and_affinity_with_test(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
         [
+            trainfile,
+            "--testfile",
             trainfile,
             "-d",
             dataroot,
@@ -115,8 +145,22 @@ def test_training_pose_and_affinity(trainfile, dataroot, tmpdir, device):
 
     training.training(args)
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
 
-def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
+
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
+
+    assert len(df_train) == 2
+    assert len(df_test) == 2
+
+
+def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, capsys):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
@@ -140,9 +184,13 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
             "--seed",
             "42",
             "--progress_bar",
+            "--base_lr",
+            "0.1",
             "--lr_dynamic",
             "--lr_patience",
             "1",
+            "--lr_min",
+            "0.001",
         ]
     )
 
@@ -151,15 +199,32 @@ def test_training_lr_scheduler(trainfile, dataroot, tmpdir, device, capsys):
     # Check that the learning rate changes during training
     # TODO: Store learning rate internally and check the cache instead
     captured = capsys.readouterr()
-    assert "Learning rate: 0.01" in captured.out  # Original (default) learning rate
+    assert "Learning rate: 0.1" in captured.out  # Initial learning rate
+    assert "Learning rate: 0.01" in captured.out  # Updated learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate
 
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
 
-def test_training_flexposepose(trainfile, dataroot, tmpdir, device):
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
+
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
+
+    assert len(df_train) == 5
+    assert len(df_test) == 5
+
+
+def test_training_flexposepose_with_test(trainfile, dataroot, tmpdir, device):
     # Do not shuffle examples randomly when loading the batch
     # This ensures reproducibility
     args = training.options(
         [
+            trainfile,
+            "--testfile",
             trainfile,
             "-d",
             dataroot,
@@ -184,3 +249,17 @@ def test_training_flexposepose(trainfile, dataroot, tmpdir, device):
     )
 
     training.training(args)
+
+    fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
+    fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
+
+    # Check presence of output files
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+    assert os.path.isfile(fname_train_metrics)
+    assert os.path.isfile(fname_test_metrics)
+
+    df_train = pd.read_csv(fname_train_metrics)
+    df_test = pd.read_csv(fname_test_metrics)
+
+    assert len(df_train) == 2
+    assert len(df_test) == 2

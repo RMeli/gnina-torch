@@ -34,6 +34,8 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
 
     training.training(args_train)
 
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+
     # Confirm that checkpoint file exists
     chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
     assert os.path.isfile(chekpointfile)
@@ -59,6 +61,11 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
     )
 
     inference.inference(args)
+
+    # Confirm inference output files exist
+    assert os.path.isfile(os.path.join(tmpdir, "inference.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "inference_results.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "inference_metrics.csv"))
 
 
 def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
@@ -94,6 +101,8 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
 
     training.training(args_train)
 
+    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+
     # Confirm that checkpoint file exists
     chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
     assert os.path.isfile(chekpointfile)
@@ -121,6 +130,11 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
     )
 
     inference.inference(args)
+
+    # Confirm inference output files exist
+    assert os.path.isfile(os.path.join(tmpdir, "inference.log"))
+    assert os.path.isfile(os.path.join(tmpdir, "inference_results.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "inference_metrics.csv"))
 
 
 def test_inference_flex(trainfile, testfile, dataroot, tmpdir, device):
@@ -183,3 +197,7 @@ def test_inference_flex(trainfile, testfile, dataroot, tmpdir, device):
     )
 
     inference.inference(args)
+
+    # Confirm inference output files exist
+    assert os.path.isfile(os.path.join(tmpdir, "inference_results.csv"))
+    assert os.path.isfile(os.path.join(tmpdir, "inference_metrics.csv"))

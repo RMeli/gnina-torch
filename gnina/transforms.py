@@ -214,3 +214,28 @@ def output_transform_select_flex(
     # Return pose class probabilities and true labels
     # log_softmax is transformed into softmax to get the class probabilities
     return torch.exp(output["flexpose_log"]), output["flexlabels"]
+
+
+def output_transform_ROC_flex(output) -> Tuple[torch.Tensor, torch.Tensor]:
+    """
+    Output transform for the ROC curve (for flexible residues pose)
+
+    Parameters
+    ----------
+    output:
+        Engine output
+
+    Returns
+    -------
+    Tuple[torch.Tensor, torch.Tensor]
+        Positive class probability and associated labels.
+
+    Notes
+    -----
+    https://pytorch.org/ignite/generated/ignite.contrib.metrics.ROC_AUC.html#roc-auc
+    """
+    # Select pose prediction
+    flexpose, flexlabels = output_transform_select_flex(output)
+
+    # Return probability estimates of the positive class
+    return flexpose[:, -1], flexlabels

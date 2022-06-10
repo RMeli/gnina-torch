@@ -62,7 +62,7 @@ def test_forward_affinity(batch_size, dims, x, device, model):
     assert affinity.shape == (batch_size,)
 
 
-@pytest.mark.parametrize("model", ["default2017"])
+@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
 def test_forward_flex(batch_size, dims, x, device, model):
     """
     Test forward pass of models for pose prediction with flexible residues.

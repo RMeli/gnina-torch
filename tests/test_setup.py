@@ -138,3 +138,35 @@ def test_grid_maker(trainfile, dataroot, device):
 
     # Check that the grid has non-zero elements
     assert any(grid[grid > 0.0])
+
+
+def test_setup_example_provider_double_balance(trainfilestrat, dataroot, device):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfilestrat,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "-g",
+            str(device),
+            "--balanced",
+            "--stratify_pos",
+            "2",
+            "--stratify_min",
+            "0",
+            "--stratify_max",
+            "1",
+            "--stratify_step",
+            "0.5",
+        ]
+    )
+
+    assert not args.shuffle
+
+    e = setup.setup_example_provider(args.trainfile, args)
+
+    assert e.num_labels() == 3  # Three labels in small.types
+    assert e.size() == 12  # Examples in small.types
+    assert e.num_types() == 28

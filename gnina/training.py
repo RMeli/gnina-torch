@@ -8,11 +8,13 @@ import sys
 from collections import defaultdict
 from typing import List, Optional
 
+import ignite
 import molgrid
 import numpy as np
 import pandas as pd
 import torch
 from ignite.contrib.handlers import ProgressBar
+from ignite.contrib.handlers.mlflow_logger import MLflowLogger, global_step_from_engine
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, timing
 from torch import nn, optim
@@ -666,18 +668,6 @@ def _setup_evaluator(
     -------
     ignite.Engine
         PyTorch Ignite engine for evaluation
-
-    Notes
-    -----
-    For pose prediction the model is rather standard (single outpout) and therefore
-    the :fun:`create_supervised_evaluator()` factory function is used.
-
-    For both pose and binding affinity prediction, the custom
-    :fun:`_evaluation_step_pose_and_affinity` is used instead.
-
-    For both ligand and flexible residues pose prediction, the custom
-    :fun:`_evaluation_step_flex` is used instead.
-
     """
     assert not (affinity and flex)
 
@@ -727,11 +717,26 @@ def training(args):
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
+    logfilename = os.path.join(args.out_dir, args.log_file)
+    logfile = open(logfilename, "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:
         outstreams = [logfile]
+
+    mlflogger = MLflowLogger()
+
+    # Log parameters from argument parser
+    # Add additional parameters
+    params = vars(args)
+    params.update(
+        {
+            "pytorch": torch.__version__,
+            "ignite": ignite.__version__,
+            "cuda": torch.version.cuda if torch.cuda.is_available() else "None",
+        }
+    )
+    mlflogger.log_params(params)
 
     # Print command line arguments
     for outstream in outstreams:
@@ -830,15 +835,42 @@ def training(args):
         clip_gradients=args.clip_gradients,
     )
 
+    mlflogger.attach_opt_params_handler(
+        trainer,
+        event_name=Events.ITERATION_STARTED,
+        optimizer=optimizer,
+        param_name="lr",  # optional
+    )
+
     allmetrics = metrics.setup_metrics(
         affinity, flex, pose_loss, affinity_loss, flexpose_loss, args.roc_auc, device
     )
 
     # Storage for metrics
+    # This is for manual logging of metrics
+    # Metrics are outputted to CSV files in the output folder and to the MLflow logger
+    # TODO: Remove redundancy? CSV files are quite useful...
     metrics_train = defaultdict(list)
     metrics_test = defaultdict(list)
 
-    evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
+    train_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
+    test_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
+
+    mlflogger.attach_output_handler(
+        train_evaluator,
+        event_name=Events.EPOCH_COMPLETED,
+        tag="Train",
+        metric_names=list(allmetrics.keys()),
+        global_step_transform=global_step_from_engine(trainer),  # Get training epoch
+    )
+
+    mlflogger.attach_output_handler(
+        test_evaluator,
+        event_name=Events.EPOCH_COMPLETED,
+        tag="Test",
+        metric_names=list(allmetrics.keys()),
+        global_step_transform=global_step_from_engine(trainer),  # Get training epoch
+    )
 
     # Define LR scheduler
     if args.lr_dynamic:
@@ -867,11 +899,11 @@ def training(args):
         Evaluate metrics on the training set and update the LR according to the loss
         function, if needed.
         """
-        evaluator.run(train_loader)
+        train_evaluator.run(train_loader)
 
         for outstream in outstreams:
             utils.log_print(
-                evaluator.state.metrics,
+                train_evaluator.state.metrics,
                 title="Train Results",
                 epoch=trainer.state.epoch,
                 epoch_time=trainer.state.times["EPOCH_COMPLETED"],
@@ -879,25 +911,18 @@ def training(args):
                 stream=outstream,
             )
 
-        mts = evaluator.state.metrics
+        mts = train_evaluator.state.metrics
         metrics_train["Epoch"].append(trainer.state.epoch)
         for key, value in mts.items():
             metrics_train[key].append(value)
 
         # Update LR based on the loss on the training set
         if args.lr_dynamic:
-            loss = mts["Loss (pose)"]
-
-            try:
-                loss += mts["Loss (affinity)"]
-            except KeyError:
-                # No affinity loss
-                pass
-            try:
-                loss += mts["Loss (flex pose)"]
-            except KeyError:
-                # No flexible residues pose loss
-                pass
+            loss = mts["Pose Loss"]
+            if affinity:
+                loss += mts["Affinity Loss"]
+            if flex:
+                loss += mts["Flex Pose Loss"]
 
             torch_scheduler.step(loss)
 
@@ -912,20 +937,21 @@ def training(args):
 
         @trainer.on(Events.EPOCH_COMPLETED(every=args.test_every))
         def log_test_results(trainer):
-            evaluator.run(test_loader)
+            test_evaluator.run(test_loader)
 
             for outstream in outstreams:
                 utils.log_print(
-                    evaluator.state.metrics,
+                    test_evaluator.state.metrics,
                     title="Test Results",
                     epoch=trainer.state.epoch,
                     stream=outstream,
                 )
 
             metrics_test["Epoch"].append(trainer.state.epoch)
-            for key, value in evaluator.state.metrics.items():
+            for key, value in test_evaluator.state.metrics.items():
                 metrics_test[key].append(value)
 
+    # TODO: Add checkpoints as artifacts to MLflow
     # TODO: Save input parameters as well
     # TODO: Save best models (lowest validation loss)
     to_save = {"model": model, "optimizer": optimizer}
@@ -952,21 +978,28 @@ def training(args):
     # Use log file name as prefix of output names
     log_root = os.path.splitext(args.log_file)[0]
 
+    metrics_train_outfile = os.path.join(args.out_dir, f"{log_root}_metrics_train.csv")
     pd.DataFrame(metrics_train).to_csv(
-        os.path.join(args.out_dir, f"{log_root}_metrics_train.csv"),
+        metrics_train_outfile,
         float_format="%.5f",
         index=False,
     )
+    mlflogger.log_artifact(metrics_train_outfile)
 
     if args.testfile is not None:
+        metrics_test_outfile = os.path.join(
+            args.out_dir, f"{log_root}_metrics_test.csv"
+        )
         pd.DataFrame(metrics_test).to_csv(
-            os.path.join(args.out_dir, f"{log_root}_metrics_test.csv"),
+            metrics_test_outfile,
             float_format="%.5f",
             index=False,
         )
+        mlflogger.log_artifact(metrics_test_outfile)
 
-    # Close log file
+    # Close log file and save as artifact
     logfile.close()
+    mlflogger.log_artifact(logfilename)
 
 
 if __name__ == "__main__":

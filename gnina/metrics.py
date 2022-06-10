@@ -75,7 +75,7 @@ def setup_metrics(
         ),
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "Balanced accuracy": metrics.Recall(
+        "Balanced Accuracy": metrics.Recall(
             average=True, output_transform=transforms.output_transform_select_pose
         ),
     }
@@ -86,7 +86,7 @@ def setup_metrics(
         # transforms.output_transform_select_pose
         m.update(
             {
-                "Loss (pose)": metrics.Loss(
+                "Pose Loss": metrics.Loss(
                     pose_loss,
                     output_transform=transforms.output_transform_select_log_pose,
                 )
@@ -125,7 +125,7 @@ def setup_metrics(
             # The loss function uses the sign to distinguish good from bad poses
             m.update(
                 {
-                    "Loss (affinity)": metrics.Loss(
+                    "Affinity Loss": metrics.Loss(
                         affinity_loss,
                         output_transform=transforms.output_transform_select_affinity,
                     )
@@ -140,12 +140,12 @@ def setup_metrics(
                 # Accuracy can be used directly without binarising the data since we are not
                 # performing binary classification (Linear(out_features=1)) but we are
                 # performing multiclass classification with 2 classes (Linear(out_features=2))
-                "Accuracy (flex)": metrics.Accuracy(
+                "Flex Accuracy": metrics.Accuracy(
                     output_transform=transforms.output_transform_select_flex
                 ),
                 # Balanced accuracy is the average recall over all classes
                 # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-                "Balanced accuracy (flex)": metrics.Recall(
+                "Flex Balanced Accuracy": metrics.Recall(
                     average=True,
                     output_transform=transforms.output_transform_select_flex,
                 ),
@@ -155,7 +155,7 @@ def setup_metrics(
         if roc_auc:
             m.update(
                 {
-                    "ROC AUC (flex)": ROC_AUC(
+                    "Flex ROC AUC": ROC_AUC(
                         output_transform=lambda output: transforms.output_transform_ROC_flex(
                             output
                         ),
@@ -170,7 +170,7 @@ def setup_metrics(
             # transforms.output_transform_select_flex
             m.update(
                 {
-                    "Loss (flex pose)": metrics.Loss(
+                    "Flex Pose Loss": metrics.Loss(
                         flexpose_loss,
                         output_transform=transforms.output_transform_select_log_flex,
                     )

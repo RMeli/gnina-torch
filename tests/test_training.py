@@ -1,5 +1,6 @@
 import os
 
+import mlflow
 import pandas as pd
 import pytest
 
@@ -55,7 +56,8 @@ def test_training(trainfile, dataroot, tmpdir, device):
         ]
     )
 
-    training.training(args)
+    with mlflow.start_run():
+        training.training(args)
 
     fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
     fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
@@ -96,7 +98,8 @@ def test_training_with_test(trainfile, dataroot, tmpdir, device):
         ]
     )
 
-    training.training(args)
+    with mlflow.start_run():
+        training.training(args)
 
     fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
     fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
@@ -143,7 +146,8 @@ def test_training_pose_and_affinity_with_test(trainfile, dataroot, tmpdir, devic
         ]
     )
 
-    training.training(args)
+    with mlflow.start_run():
+        training.training(args)
 
     fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
     fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")
@@ -194,7 +198,8 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
         ]
     )
 
-    training.training(args)
+    with mlflow.start_run():
+        training.training(args)
 
     # Check that the learning rate changes during training
     # TODO: Store learning rate internally and check the cache instead
@@ -248,7 +253,8 @@ def test_training_flexposepose_with_test(trainfile, dataroot, tmpdir, device):
         ]
     )
 
-    training.training(args)
+    with mlflow.start_run():
+        training.training(args)
 
     fname_train_metrics = os.path.join(tmpdir, "training_metrics_train.csv")
     fname_test_metrics = os.path.join(tmpdir, "training_metrics_test.csv")

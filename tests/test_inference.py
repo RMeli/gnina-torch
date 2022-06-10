@@ -1,10 +1,13 @@
 import os
 
+import mlflow
+
 from gnina import inference, training
 
 
 def test_inference(trainfile, testfile, dataroot, tmpdir, device):
     epochs = 1
+    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
 
     # Use training function in order to create a checkpoint
     args_train = training.options(
@@ -32,14 +35,6 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
         ]
     )
 
-    training.training(args_train)
-
-    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-
-    # Confirm that checkpoint file exists
-    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
-    assert os.path.isfile(chekpointfile)
-
     args = inference.options(
         [
             testfile,
@@ -60,7 +55,14 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
         ]
     )
 
-    inference.inference(args)
+    with mlflow.start_run():
+        training.training(args_train)
+
+        # Check that training was performed and produced a checkpoint file
+        assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+        assert os.path.isfile(chekpointfile)
+
+        inference.inference(args)
 
     # Confirm inference output files exist
     assert os.path.isfile(os.path.join(tmpdir, "inference.log"))
@@ -70,66 +72,58 @@ def test_inference(trainfile, testfile, dataroot, tmpdir, device):
 
 def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
     epochs = 1
+    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
+    model = "default2017"
+
+    common_args = [
+        "-d",
+        dataroot,
+        "--affinity_pos",
+        "1",
+        "--batch_size",
+        "1",
+        "-o",
+        str(tmpdir),
+        "-g",
+        str(device),
+        "--seed",
+        "42",
+    ]
 
     # Use training function in order to create a checkpoint
     args_train = training.options(
         [
             trainfile,
             "-m",
-            "default2017",
-            "-d",
-            dataroot,
-            "--affinity_pos",
-            "1",
+            model,
             "--no_shuffle",
-            "--batch_size",
-            "1",
             "--test_every",
             "1",
             "--checkpoint_every",
             "1",
             "--iterations",
             str(epochs),
-            "-o",
-            str(tmpdir),
-            "-g",
-            str(device),
-            "--seed",
-            "42",
         ]
+        + common_args
     )
-
-    training.training(args_train)
-
-    assert os.path.isfile(os.path.join(tmpdir, "training.log"))
-
-    # Confirm that checkpoint file exists
-    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
-    assert os.path.isfile(chekpointfile)
 
     args = inference.options(
         [
             testfile,
             "default2017",
             chekpointfile,
-            "-d",
-            dataroot,
-            "--affinity_pos",
-            "1",
-            "--batch_size",
-            "1",
-            "-o",
-            str(tmpdir),
-            "-g",
-            str(device),
-            "--seed",
-            "42",
-            "--label_pos",
-            "0",
         ]
+        + common_args
     )
 
-    inference.inference(args)
+    with mlflow.start_run():
+        training.training(args_train)
+
+        # Check that training was performed and produced a checkpoint file
+        assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+        assert os.path.isfile(chekpointfile)
+
+        inference.inference(args)
 
     # Confirm inference output files exist
     assert os.path.isfile(os.path.join(tmpdir, "inference.log"))
@@ -139,64 +133,60 @@ def test_inference_affinity(trainfile, testfile, dataroot, tmpdir, device):
 
 def test_inference_flex(trainfile, testfile, dataroot, tmpdir, device):
     epochs = 1
+    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
+    model = "default2017"
+
+    common_args = [
+        "-d",
+        dataroot,
+        "--label_pos",
+        "0",
+        "--flexlabel_pos",
+        "2",
+        "--batch_size",
+        "1",
+        "-o",
+        str(tmpdir),
+        "-g",
+        str(device),
+        "--seed",
+        "42",
+    ]
 
     # Use training function in order to create a checkpoint
     args_train = training.options(
         [
             trainfile,
             "-m",
-            "default2017",
-            "-d",
-            dataroot,
-            "--flexlabel_pos",
-            "2",
+            model,
             "--no_shuffle",
-            "--batch_size",
-            "1",
             "--test_every",
             "1",
             "--checkpoint_every",
             "1",
             "--iterations",
             str(epochs),
-            "-o",
-            str(tmpdir),
-            "-g",
-            str(device),
-            "--seed",
-            "42",
         ]
+        + common_args
     )
-
-    training.training(args_train)
-
-    # Confirm that checkpoint file exists
-    chekpointfile = os.path.join(str(tmpdir), f"checkpoint_{epochs}.pt")
-    assert os.path.isfile(chekpointfile)
 
     args = inference.options(
         [
             testfile,
-            "default2017",
+            model,
             chekpointfile,
-            "-d",
-            dataroot,
-            "--flexlabel_pos",
-            "2",
-            "--batch_size",
-            "1",
-            "-o",
-            str(tmpdir),
-            "-g",
-            str(device),
-            "--seed",
-            "42",
-            "--label_pos",
-            "0",
         ]
+        + common_args
     )
 
-    inference.inference(args)
+    with mlflow.start_run():
+        training.training(args_train)
+
+        # Check that training was performed and produced a checkpoint file
+        assert os.path.isfile(os.path.join(tmpdir, "training.log"))
+        assert os.path.isfile(chekpointfile)
+
+        inference.inference(args)
 
     # Confirm inference output files exist
     assert os.path.isfile(os.path.join(tmpdir, "inference_results.csv"))

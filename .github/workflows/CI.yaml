@@ -25,12 +25,12 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
-    - name: Additional info about the build
+    - name: Infos
       shell: bash
       run: |
         uname -a
@@ -39,13 +39,13 @@ jobs:
 
 
     # More info on options: https://github.com/conda-incubator/setup-miniconda
-    - uses: conda-incubator/setup-miniconda@v2
+    - uses: conda-incubator/setup-miniconda@v2.1.1
       with:
         python-version: ${{ matrix.python-version }}
-        environment-file: devtools/conda-envs/gninatorch.yaml
-
-        channels: conda-forge,defaults
-
+        environment-file: devtools/conda-envs/gninatorch-CI.yaml
+        mamba-version: "*"
+        channels: conda-forge,pytorch
+        channel-priority: true
         activate-environment: gninatorch
         auto-update-conda: false
         auto-activate-base: false

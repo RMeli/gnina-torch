@@ -45,12 +45,12 @@ def options(args: Optional[List[str]] = None):
         help="Root folder for relative paths in train files",
     )
 
-    parser.add_argument(
-        "--rotations",
-        type=int,
-        default=1,
-        help="Number of rotations to average on",
-    )
+    # parser.add_argument(
+    #     "--rotations",
+    #     type=int,
+    #     default=1,
+    #     help="Number of rotations to average on",
+    # )
 
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"

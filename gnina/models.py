@@ -65,6 +65,10 @@ class Default2017(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+
         self.input_dims = input_dims
 
         self.features = nn.Sequential(
@@ -73,7 +77,7 @@ class Default2017(nn.Module):
                     # unit1
                     ("unit1_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit1_conv",
+                        "unit1_conv1",
                         nn.Conv3d(
                             in_channels=input_dims[0],
                             out_channels=32,
@@ -82,11 +86,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit1_func", nn.ReLU()),
+                    ("unit1_relu1", nn.ReLU()),
                     # unit2
                     ("unit2_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit2_conv",
+                        "unit2_conv1",
                         nn.Conv3d(
                             in_channels=32,
                             out_channels=64,
@@ -95,11 +99,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit2_func", nn.ReLU()),
+                    ("unit2_relu1", nn.ReLU()),
                     # unit3
                     ("unit3_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit3_conv",
+                        "unit3_conv1",
                         nn.Conv3d(
                             in_channels=64,
                             out_channels=128,
@@ -108,7 +112,7 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit3_func", nn.ReLU()),
+                    ("unit3_relu1", nn.ReLU()),
                 ]
             )
         )
@@ -257,6 +261,11 @@ class Default2018(nn.Module):
     def __init__(self, input_dims: Tuple):
 
         super().__init__()
+
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+        self.input_dims = input_dims
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -581,6 +590,9 @@ class Dense(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
         self.input_dims = input_dims
 
         features: OrderedDict[str, nn.Module] = OrderedDict(

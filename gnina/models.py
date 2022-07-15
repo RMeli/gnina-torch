@@ -496,7 +496,7 @@ class DenseBlock(nn.Module):
 
         super().__init__()
 
-        self.blocks = nn.ModuleList()
+        dense_dict: OrderedDict[str, nn.Module] = OrderedDict()
 
         self.in_features = in_features
         self.num_block_features = num_block_features
@@ -504,23 +504,32 @@ class DenseBlock(nn.Module):
 
         in_features_layer = in_features
         for idx in range(num_block_convs):
-            block: OrderedDict[str, nn.Module] = OrderedDict()
-            block[f"data_enc_level{tag}_batchnorm_conv{idx}"] = nn.BatchNorm3d(
-                in_features_layer,
-                affine=True,  # Same effect as "Scale" layer in Caffe
+            dense_dict.update(
+                [
+                    (
+                        f"data_enc_level{tag}_batchnorm_conv{idx}",
+                        nn.BatchNorm3d(
+                            in_features_layer,
+                            affine=True,  # Same effect as "Scale" layer in Caffe
+                        ),
+                    ),
+                    (
+                        f"data_enc_level{tag}_conv{idx}",
+                        nn.Conv3d(
+                            in_channels=in_features_layer,
+                            out_channels=num_block_features,
+                            kernel_size=3,
+                            padding=1,
+                        ),
+                    ),
+                    (f"data_enc_level{tag}_conv{idx}_relu", nn.ReLU()),
+                ]
             )
-            block[f"data_enc_level{tag}_conv{idx}"] = nn.Conv3d(
-                in_channels=in_features_layer,
-                out_channels=num_block_features,
-                kernel_size=3,
-                padding=1,
-            )
-            block[f"data_enc_level{tag}_conv{idx}_relu"] = nn.ReLU()
-
-            self.blocks.append(nn.Sequential(block))
 
             # The next layer takes all previous features as input
             in_features_layer += num_block_features
+
+        self.blocks = nn.Sequential(dense_dict)
 
     def out_features(self) -> int:
         return self.in_features + self.num_block_features * self.num_block_convs
@@ -543,12 +552,13 @@ class DenseBlock(nn.Module):
             # Forward propagation to single block
             x = block(x)
 
-            # Store current block output
-            outputs.append(x)
+            if isinstance(block, nn.ReLU):
+                # Store current block output
+                outputs.append(x)
 
-            # Concatenate all previous outputs as next input
-            # Concatenate on channels
-            x = torch.cat(outputs, dim=1)
+                # Concatenate all previous outputs as next input
+                # Concatenate on channels
+                x = torch.cat(outputs, dim=1)
 
         return x
 

@@ -100,7 +100,7 @@ def _load_gnina_model_file(
         model: Union[
             models.Default2017Affinity, models.Default2018Affinity
         ] = models.Default2017Affinity(
-            input_dims=(32, num_voxels, num_voxels, num_voxels)
+            input_dims=(35, num_voxels, num_voxels, num_voxels)
         )
     elif "default2018" in weights_file:
         # 28 channels:
@@ -112,11 +112,13 @@ def _load_gnina_model_file(
         # TODO: Load dense model (name conversions are a bit of a pain...)
         raise NotImplementedError("Dense models are not supported yet.")
     else:
-        raise RuntimeError(f"Unknown model: {weights_file}")
+        raise ValueError(f"Unknown model name: {weights_file}")
 
     weights = _load_weights(weights_file)
 
-    return model.load_state_dict(weights)
+    model.load_state_dict(weights)
+
+    return model
 
 
 def load_gnina_model(

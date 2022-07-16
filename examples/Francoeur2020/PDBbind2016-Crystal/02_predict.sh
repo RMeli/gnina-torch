@@ -5,7 +5,7 @@ checkpoint="checkpoint_750.pt"
 for i in 1 2 3 4 5 6
 do
 nohup \
-python -m gnina.inference \
+python -m gninatorch.inference \
     ../data/types/ref_uff_test0.types \
     default2018 \
     out${i}/${checkpoint} \

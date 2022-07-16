@@ -4,7 +4,7 @@ import mlflow
 import pandas as pd
 import pytest
 
-from gnina import training
+from gninatorch import training
 
 
 def test_options_default(trainfile):

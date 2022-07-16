@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from gnina import transforms
+from gninatorch import transforms
 
 
 @pytest.fixture

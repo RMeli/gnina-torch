@@ -10,7 +10,7 @@ test_every=5
 for i in 1 2 3
 do
 nohup \
-python -m gnina.training \
+python -m gninatorch.training \
     ../data/types/ref_uff_train0.types \
     --testfile ../data/types/ref_uff_test0.types \
     --data_root ../data/ \
@@ -36,7 +36,7 @@ done
 for i in 4 5 6
 do
 nohup \
-python -m gnina.training \
+python -m gninatorch.training \
     ../data/types/ref_uff_train0.types \
     --testfile ../data/types/ref_uff_test0.types \
     --data_root ../data/ \

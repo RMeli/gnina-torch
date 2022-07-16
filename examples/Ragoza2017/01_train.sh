@@ -18,7 +18,7 @@ do
     mkdir -p ${outdir}
 
     nohup \
-    python -m gnina.training \
+    python -m gninatorch.training \
         models-master/data/csar/alltrain${i}.types \
         --testfile models-master/data/csar/alltest${i}.types \
         --data_root models-master/data/csar/ \
@@ -39,7 +39,7 @@ do
     mkdir -p ${outdir}
 
     nohup \
-    python -m gnina.training \
+    python -m gninatorch.training \
         models-master/data/csar/alltrain${i}.types \
         --testfile models-master/data/csar/alltest${i}.types \
         --data_root models-master/data/csar/ \

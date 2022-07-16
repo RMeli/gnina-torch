@@ -2,11 +2,11 @@ import sys
 
 import molgrid
 
-import gnina
+import gninatorch
 
 
 def test_gnina_imported():
-    assert gnina.__name__ in sys.modules
+    assert gninatorch.__name__ in sys.modules
 
 
 def test_molgrid_imported():

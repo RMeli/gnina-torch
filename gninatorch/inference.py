@@ -11,8 +11,8 @@ import torch
 from ignite.engine import Events
 from ignite.handlers import Checkpoint
 
-from gnina import metrics, models, setup, training, utils
-from gnina.dataloaders import GriddedExamplesLoader
+from gninatorch import metrics, models, setup, training, utils
+from gninatorch.dataloaders import GriddedExamplesLoader
 
 
 def options(args: Optional[List[str]] = None):

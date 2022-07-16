@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 
 import torch
 
-from gnina import dataloaders, models, setup, utils
+from gninatorch import dataloaders, models, setup, utils
 
 
 def _rename(key: str) -> str:
@@ -69,7 +69,7 @@ def _load_weights(weights_file: str):
     """
     weights = torch.load(weights_file)
 
-    # Rename Caffe layers according to PyTorch names defined in gnina.models
+    # Rename Caffe layers according to PyTorch names defined in gninatorch.models
     weights_renamed = OrderedDict(
         ((_rename(key), value) for key, value in weights.items())
     )

@@ -45,6 +45,14 @@ Once the [conda](https://docs.conda.io/en/latest/) environment is created and ac
 python -m pip install .
 ```
 
+### Tests
+
+In order to check the installation, unit tests are provided and can be run with [pytest](https://docs.pytest.org/):
+
+```bash
+pytest --cov=gnina
+```
+
 ## Usage
 
 Training and inference modules try to follow the original [Caffe](https://caffe.berkeleyvision.org/) implementation of [gnina/scripts](https://github.com/gnina/scripts), however not all features are implemented.
@@ -83,14 +91,6 @@ Inference is implemented in the `inference` module:
 
 ```bash
 python -m gnina.inference --help
-```
-
-### Tests
-
-In order to check the installation, unit tests are provided and can be run with [pytest](https://docs.pytest.org/):
-
-```bash
-pytest --cov=gnina
 ```
 
 ## Acknowledgments

@@ -14,7 +14,7 @@ connected layer instead of the softmax.
 """
 
 from collections import OrderedDict, namedtuple
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -1397,3 +1397,27 @@ models_dict = {
     Model("hires_pose", True, False): HiResPose,
     Model("hires_affinity", True, False): HiResAffinity,
 }
+
+
+class ModelEnsemble(nn.Module):
+    def __init__(self, models: List[nn.Module]):
+        super().__init__()
+
+        self.models = models
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+        """
+        predictions = [model(x) for model in self.models]
+
+        if isinstance(predictions[0], tuple):
+            stacked_predictions = []
+            for pred in map(list, zip(*predictions)):
+                stacked_predictions.append(torch.stack(pred).mean(dim=0))
+            return tuple(stacked_predictions)
+        else:
+            return torch.stack(predictions).mean(dim=0)

@@ -830,3 +830,46 @@ def test_GriddedExamplesLoader_balanced_batch_size_2_flexlabel_stratified(
 
         # Restart iterator
         dataset_large = iter(dataset_large)
+
+
+@pytest.mark.parametrize("iteration_scheme", ["small", "large"])
+def test_GriddedExamplesLoader_gridonly(
+    testfile_nolabels, dataroot, device, iteration_scheme
+):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            testfile_nolabels,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "--batch_size",
+            "1",
+            "--iteration_scheme",
+            iteration_scheme,
+        ]
+    )
+
+    e = setup.setup_example_provider(args.trainfile, args, training=False)
+    gmaker = setup.setup_grid_maker(args)
+
+    dataset = GriddedExamplesLoader(
+        example_provider=e, grid_maker=gmaker, device=device, grids_only=True
+    )
+
+    assert dataset.num_examples_tot == 3
+    assert dataset.num_labels == 0
+
+    # Without balancing the length of the dataset is the same as the number of examples
+    # This is true for both small and large epochs
+    assert dataset.example_provider.small_epoch_size() == 3
+    assert dataset.example_provider.large_epoch_size() == 3
+
+    for _ in range(3):
+        grids = next(dataset)
+        assert grids.shape == (1, 28, 48, 48, 48)
+
+    # Check that the iterator is exhausted at the end of an epoch
+    with pytest.raises(StopIteration):
+        next(dataset)

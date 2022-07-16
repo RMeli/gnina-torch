@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from gnina.models import DenseBlock, models_dict
+from gninatorch.models import DenseBlock, models_dict
 
 
 @pytest.fixture

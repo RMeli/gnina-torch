@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from gnina import setup, training
-from gnina.dataloaders import GriddedExamplesLoader
+from gninatorch import setup, training
+from gninatorch.dataloaders import GriddedExamplesLoader
 
 
 @pytest.mark.parametrize("iteration_scheme", ["small", "large"])

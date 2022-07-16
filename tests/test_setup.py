@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from gnina import setup, training
+from gninatorch import setup, training
 
 
 def test_setup_example_provider_default(trainfile, dataroot, device):

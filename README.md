@@ -26,7 +26,7 @@ If you are using the pre-trained `default2018` and `dense` models from [GNINA](h
 
 ## Installation
 
-The `gnina` Python package has several dependencies, including:
+The `gninatorch` Python package has several dependencies, including:
 
 * [PyTorch](https://pytorch.org/)
 * [PyTorch-Ignite](https://pytorch.org/ignite/)
@@ -39,7 +39,7 @@ conda env create -f devtools/conda-envs/gninatorch.yaml
 conda activate gninatorch
 ```
 
-Once the [conda](https://docs.conda.io/en/latest/) environment is created and activated, the `gnina` package can be installed using [pip](https://pip.pypa.io/en/stable/) as follows:
+Once the [conda](https://docs.conda.io/en/latest/) environment is created and activated, the `gninatorch` package can be installed using [pip](https://pip.pypa.io/en/stable/) as follows:
 
 ```bash
 python -m pip install .
@@ -50,7 +50,7 @@ python -m pip install .
 In order to check the installation, unit tests are provided and can be run with [pytest](https://docs.pytest.org/):
 
 ```bash
-pytest --cov=gnina
+pytest --cov=gninatorch
 ```
 
 ## Usage
@@ -59,14 +59,14 @@ Training and inference modules try to follow the original [Caffe](https://caffe.
 
 The folder `examples` includes some complete examples for training and inference.
 
-The folder `gnina/weights` contains pre-trained models from [GNINA](https://github.com/gnina/gnina), converted from Caffe to PyTorch.
+The folder `gninatorch/weights` contains pre-trained models from [GNINA](https://github.com/gnina/gnina), converted from Caffe to PyTorch.
 
 ### Pre-trained GNINA models
 
 Pre-trained models (`--cnn` argument in [GNINA](https://github.com/gnina/gnina)) can be easily loaded as follows:
 
 ```python
-from gnina.gnina import load_gnina_model
+from gninatorch.gnina import load_gnina_model
 
 model = load_gnina_model(MODEL_NAME)
 ```
@@ -74,7 +74,7 @@ model = load_gnina_model(MODEL_NAME)
 Inference with pre-trained [GNINA](https://github.com/gnina/gnina) models is implemented in the `gnina` module:
 
 ```bash
-python -m gnina.gnina --helpss
+python -m gninatorch.gnina --help
 ```
 
 ### Training
@@ -82,7 +82,7 @@ python -m gnina.gnina --helpss
 Training is implemented in the `training` module:
 
 ```bash
-python -m gnina.training --help
+python -m gninatorch.training --help
 ```
 
 ### Inference
@@ -90,7 +90,7 @@ python -m gnina.training --help
 Inference is implemented in the `inference` module:
 
 ```bash
-python -m gnina.inference --help
+python -m gninatorch.inference --help
 ```
 
 ## Acknowledgments

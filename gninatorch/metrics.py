@@ -5,7 +5,7 @@ from ignite import metrics
 from ignite.contrib.metrics import ROC_AUC
 from torch import nn
 
-from gnina import transforms
+from gninatorch import transforms
 
 
 def setup_metrics(

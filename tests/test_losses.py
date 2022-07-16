@@ -3,7 +3,7 @@ import pytest
 import torch
 from torch import nn
 
-from gnina import losses
+from gninatorch import losses
 
 
 def test_affinity_loss_perfect_predictions(device):

@@ -1,7 +1,3 @@
-"""
-gnina
-PyTorch implementation of GNINA
-"""
 import sys
 from typing import Optional
 
@@ -24,7 +20,7 @@ except Exception:
 
 setup(
     # Self-descriptive entries which should always be present
-    name="gnina",
+    name="gninatorch",
     author="Rocco Meli",
     author_email="rocco.meli@biodtp.ox.ac.uk",
     description=short_description,

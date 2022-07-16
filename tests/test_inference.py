@@ -2,7 +2,7 @@ import os
 
 import mlflow
 
-from gnina import inference, training
+from gninatorch import inference, training
 
 
 def test_inference(trainfile, testfile, dataroot, tmpdir, device):

@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from gnina import utils
+from gninatorch import utils
 
 
 def test_set_device_cpu():

@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 import torch
 
-from gnina import gnina, models
-from gnina.dataloaders import GriddedExamplesLoader
+from gninatorch import gnina, models
+from gninatorch.dataloaders import GriddedExamplesLoader
 
 
 @pytest.mark.parametrize(

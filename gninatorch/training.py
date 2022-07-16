@@ -19,10 +19,10 @@ from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, timing
 from torch import nn, optim
 
-from gnina import metrics, setup, utils
-from gnina.dataloaders import GriddedExamplesLoader
-from gnina.losses import AffinityLoss, ScaledNLLLoss
-from gnina.models import models_dict, weights_and_biases_init
+from gninatorch import metrics, setup, utils
+from gninatorch.dataloaders import GriddedExamplesLoader
+from gninatorch.losses import AffinityLoss, ScaledNLLLoss
+from gninatorch.models import models_dict, weights_and_biases_init
 
 
 def options(args: Optional[List[str]] = None):

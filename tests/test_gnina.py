@@ -1,3 +1,5 @@
+import re
+
 import molgrid
 import numpy as np
 import pytest
@@ -127,3 +129,42 @@ def test_gnina_model_prediction(
 
     assert np.allclose(negative_score, 1 - CNNscore, atol=1e-6)
     assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "model_name, CNNscore, CNNaffinity",
+    [
+        (
+            "redock_default2018",
+            np.array([0.02956, 0.00114, 0.00095]),
+            np.array([1.31840, 1.20986, 1.14063]),
+        ),
+        (
+            "general_default2018",
+            np.array([0.32619, 0.37634, 0.39832]),
+            np.array([1.28267, 1.36640, 1.50419]),
+        ),
+        (
+            "crossdock_default2018",
+            np.array([0.64764, 0.43467, 0.19287]),
+            np.array([1.28360, 1.27934, 1.06574]),
+        ),
+    ],
+)
+def test_gnina(testfile_nolabels, dataroot, model_name, capsys, CNNscore, CNNaffinity):
+    args = gnina.options([testfile_nolabels, "-d", dataroot, "--cnn", model_name])
+
+    gnina.main(args)
+
+    captured = capsys.readouterr()
+    assert "CNNscore" in captured.out
+    assert "CNNaffinity" in captured.out
+
+    score_re = re.findall(r"CNNscore: (.*)", captured.out)
+    score = np.array([float(s) for s in score_re])
+
+    affinity_re = re.findall(r"CNNaffinity: (.*)", captured.out)
+    affinity = np.array([float(s) for s in affinity_re])
+
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(affinity, CNNaffinity, atol=1e-6)

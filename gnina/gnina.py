@@ -202,7 +202,7 @@ def options(args: Optional[List[str]] = None):
     return parser.parse_args(args)
 
 
-def gnina(args):
+def main(args):
     model = load_gnina_model(args.cnn, args.dimension, args.resolution)
 
     device = utils.set_device(args.gpu)
@@ -248,4 +248,4 @@ def _intro():
 if __name__ == "__main__":
     _intro()
     args = options()
-    gnina(args)
+    main(args)

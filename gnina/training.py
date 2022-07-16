@@ -21,7 +21,7 @@ from torch import nn, optim
 
 from gnina import metrics, setup, utils
 from gnina.dataloaders import GriddedExamplesLoader
-from gnina.losses import AffinityLoss
+from gnina.losses import AffinityLoss, ScaledNLLLoss
 from gnina.models import models_dict, weights_and_biases_init
 
 
@@ -68,9 +68,39 @@ def options(args: Optional[List[str]] = None):
         help="Affinity value position in training file",
     )
     parser.add_argument(
+        "--flexlabel_pos",
+        type=int,
+        default=None,
+        help="Flexible residues pose label position in training file",
+    )
+    parser.add_argument(
         "--stratify_receptor",
         action="store_true",
         help="Sample uniformly across receptors",
+    )
+    parser.add_argument(
+        "--stratify_pos",
+        type=int,
+        default=1,
+        help="Sample uniformly across bins",
+    )
+    parser.add_argument(
+        "--stratify_max",
+        type=float,
+        default=0,
+        help="Maximum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_min",
+        type=float,
+        default=0,
+        help="Minimum range for value stratification",
+    )
+    parser.add_argument(
+        "--stratify_step",
+        type=float,
+        default=0,
+        help="Step size for value stratification",
     )
     parser.add_argument(
         "--ligmolcache",
@@ -86,6 +116,9 @@ def options(args: Optional[List[str]] = None):
     )
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
+    )
+    parser.add_argument(
+        "--log_file", type=str, default="training.log", help="Log file name"
     )
 
     # Scoring function
@@ -182,6 +215,18 @@ def options(args: Optional[List[str]] = None):
         default=1.0,
         help="Penalty for affinity loss",
     )
+    parser.add_argument(
+        "--scale_pose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for pose loss",
+    )
+    parser.add_argument(
+        "--scale_flexpose_loss",
+        type=float,
+        default=1.0,
+        help="Scale factor for flexible residues pose loss",
+    )
 
     # Misc
     parser.add_argument(
@@ -195,6 +240,15 @@ def options(args: Optional[List[str]] = None):
     )
     parser.add_argument(
         "--num_checkpoints", type=int, default=1, help="Number of checkpoints to keep"
+    )
+    parser.add_argument(
+        "--checkpoint_prefix", type=str, default="", help="Checkpoint file prefix"
+    )
+    parser.add_argument(
+        "--checkpoint_dir",
+        type=str,
+        default="",
+        help="Checkpoint directory (appended to output directory)",
     )
     parser.add_argument("--progress_bar", action="store_true", help="Show progress bar")
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
@@ -328,8 +382,67 @@ def _train_step_pose_and_affinity(
     return loss.item()
 
 
+def _train_step_flex(
+    trainer: Engine,
+    batch,
+    model: nn.Module,
+    optimizer,
+    pose_loss: nn.Module,
+    flexpose_loss: nn.Module,
+    clip_gradients: float,
+) -> float:
+    """
+    Training step for pose prediction.
+
+    Parameters
+    ----------
+    trainer: Engine
+        PyTorch Ignite engine for training
+    batch:
+        Batch of data
+    model:
+        PyTorch model
+    optimizer:
+        PyTorch optimizer
+    pose_loss:
+        Loss function for pose prediction
+    flexpose_loss:
+        Loss function for flexible residues pose prediction
+    clip_gradients:
+        Gradient clipping threshold
+
+    Returns
+    -------
+    float
+        Loss
+
+    Notes
+    -----
+    Gradients are clipped by norm and not by value.
+    """
+    model.train()
+    optimizer.zero_grad()
+
+    # Data is already on the correct device thanks to the ExampleProvider
+    grids, labels, flexlabels = batch
+
+    pose_log, flexpose_log = model(grids)
+
+    # Compute loss for pose prediction
+    loss = pose_loss(pose_log, labels) + flexpose_loss(flexpose_log, flexlabels)
+
+    loss.backward()
+
+    # TODO: Double check that gradient clipping by norm corresponds to the Caffe
+    # implementation
+    nn.utils.clip_grad_norm_(model.parameters(), clip_gradients)
+    optimizer.step()
+
+    return loss.item()
+
+
 def _setup_trainer(
-    model, optimizer, pose_loss, affinity_loss, clip_gradients: float
+    model, optimizer, pose_loss, affinity_loss, flexpose_loss, clip_gradients: float
 ) -> Engine:
     """
     Setup training engine for binding pose prediction or binding pose and affinity
@@ -345,16 +458,28 @@ def _setup_trainer(
         Loss function for pose prediction
     affinity_loss:
         Loss function for affinity prediction
+    flexpose_loss:
+        Loss function for flexible residues pose prediction
     clip_gradients:
         Gradient clipping threshold
 
     Notes
     -----
-    If :code:`affinity_loss is Non e`, the model return both pose and affinity
-    predictions, which requites a custom training step to evaluate the combine loss
-    function. The custom training step is defined in
+    The arguments :code:`affinity_loss` and :code:`flexpose_loss` determine the type of
+    training to be performed.
+
+    If :code:`affinity_loss is not None`, multi-task learning on both the ligand pose
+    and the binding affinity is performed using the training function
     :fun:`_train_step_pose_and_affinity`.
+
+    If :code:`flexpose_loss is not None`, multi-task learning on both the ligand pose
+    and the pose of the flexible residues is performed using the training function
+    :fun:`_train_step_flex`.
     """
+    # Affinity prediction is currently incompatible with flexible residues pose
+    # prediction
+    assert affinity_loss is None or flexpose_loss is None
+
     if affinity_loss is not None:
         # Pose prediction and binding affinity prediction
         # Create engine based on custom train step
@@ -366,6 +491,20 @@ def _setup_trainer(
                 optimizer,
                 pose_loss=pose_loss,
                 affinity_loss=affinity_loss,
+                clip_gradients=clip_gradients,
+            )
+        )
+    elif flexpose_loss is not None:
+        # Ligand and flexible residues pose prediction
+        # Create engine based on custom train step
+        trainer = Engine(
+            lambda trainer, batch: _train_step_flex(
+                trainer,
+                batch,
+                model,
+                optimizer,
+                pose_loss=pose_loss,
+                flexpose_loss=flexpose_loss,
                 clip_gradients=clip_gradients,
             )
         )
@@ -467,7 +606,49 @@ def _evaluation_step_pose(evaluator: Engine, batch, model):
     return output
 
 
-def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
+def _evaluation_step_flex(evaluator: Engine, batch, model):
+    """
+    Evaluate model for ligand and flexible residues pose prediction.
+
+    Parameters
+    ----------
+    evaluator:
+        PyTorch Ignite :code:`Engine`
+    batch:
+        Batch data
+    model:
+        Model
+
+    Returns
+    -------
+    Tuple[torch.Tensor]
+        Log class probabilities for pose prediction, log class probabilities for flexible
+        residues pose prediction, true pose labels, and true flexible residues pose
+        labels
+
+    Notes
+    -----
+    The model returns the log softmax of the last linear layer for binding pose
+    prediction (log class probabilities).
+    """
+    model.eval()
+    with torch.no_grad():
+        grids, labels, flexlabels = batch
+        pose_log, flexpose_log = model(grids)
+
+    output = {
+        "pose_log": pose_log,
+        "flexpose_log": flexpose_log,
+        "labels": labels,
+        "flexlabels": flexlabels,
+    }
+
+    return output
+
+
+def _setup_evaluator(
+    model, metrics, affinity: bool = False, flex: bool = False
+) -> Engine:
     """
     Setup PyTorch Ignite :code:`Engine` for evaluation.
 
@@ -478,18 +659,27 @@ def _setup_evaluator(model, metrics, affinity: bool = False) -> Engine:
     metrics:
         Evaluation metrics
     affinity: bool
-        Flag for affinity prediction (in addition to pose prediction)
+        Flag for affinity prediction (in addition to ligand pose prediction)
+    flex: bool
+        Flag for flexible residues pose prediction (in addition to ligand pose
+        prediction)
 
     Returns
     -------
     ignite.Engine
         PyTorch Ignite engine for evaluation
     """
+    assert not (affinity and flex)
+
     if affinity:
         evaluator = Engine(
             lambda evaluator, batch: _evaluation_step_pose_and_affinity(
                 evaluator, batch, model
             )
+        )
+    elif flex:
+        evaluator = Engine(
+            lambda evaluator, batch: _evaluation_step_flex(evaluator, batch, model)
         )
     else:
         evaluator = Engine(
@@ -520,12 +710,14 @@ def training(args):
     the structures that are read from .gninatypes files. The training then speeds up
     considerably.
     """
+    # Affinity prediction not supported with flexible residues (and vice versa)
+    assert args.affinity_pos is None or args.flexlabel_pos is None
 
     # Create necessary directories if not already present
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfilename = os.path.join(args.out_dir, "training.log")
+    logfilename = os.path.join(args.out_dir, args.log_file)
     logfile = open(logfilename, "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
@@ -576,6 +768,7 @@ def training(args):
         grid_maker=grid_maker,
         label_pos=args.label_pos,
         affinity_pos=args.affinity_pos,
+        flexlabel_pos=args.flexlabel_pos,
         random_translation=args.random_translation,
         random_rotation=args.random_rotation,
         device=device,
@@ -587,6 +780,7 @@ def training(args):
             grid_maker=grid_maker,
             label_pos=args.label_pos,
             affinity_pos=args.affinity_pos,
+            flexlabel_pos=args.flexlabel_pos,
             random_translation=args.random_translation,
             random_rotation=args.random_rotation,
             device=device,
@@ -594,11 +788,12 @@ def training(args):
 
         assert test_loader.dims == train_loader.dims
 
-    affinity: bool = True if args.affinity_pos is not None else False
+    affinity: bool = args.affinity_pos is not None
+    flex: bool = args.flexlabel_pos is not None
 
     # Create model
     # Select model based on architecture and affinity flag (pose vs affinity)
-    model = models_dict[(args.model, affinity)](train_loader.dims).to(device)
+    model = models_dict[(args.model, affinity, flex)](train_loader.dims).to(device)
     model.apply(weights_and_biases_init)
 
     # Compile model into TorchScript
@@ -612,7 +807,7 @@ def training(args):
     )
 
     # Define loss functions
-    pose_loss = torch.jit.script(nn.NLLLoss())
+    pose_loss = torch.jit.script(ScaledNLLLoss(scale=args.scale_pose_loss))
     affinity_loss = (
         torch.jit.script(
             AffinityLoss(
@@ -625,12 +820,18 @@ def training(args):
         if affinity
         else None
     )
+    flexpose_loss = (
+        torch.jit.script(ScaledNLLLoss(scale=args.scale_flexpose_loss))
+        if flex
+        else None
+    )
 
     trainer = _setup_trainer(
         model,
         optimizer,
         pose_loss=pose_loss,
         affinity_loss=affinity_loss,
+        flexpose_loss=flexpose_loss,
         clip_gradients=args.clip_gradients,
     )
 
@@ -642,7 +843,7 @@ def training(args):
     )
 
     allmetrics = metrics.setup_metrics(
-        affinity, pose_loss, affinity_loss, args.roc_auc, device
+        affinity, flex, pose_loss, affinity_loss, flexpose_loss, args.roc_auc, device
     )
 
     # Storage for metrics
@@ -652,8 +853,8 @@ def training(args):
     metrics_train = defaultdict(list)
     metrics_test = defaultdict(list)
 
-    train_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
-    test_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity)
+    train_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
+    test_evaluator = _setup_evaluator(model, allmetrics, affinity=affinity, flex=flex)
 
     mlflogger.attach_output_handler(
         train_evaluator,
@@ -720,6 +921,8 @@ def training(args):
             loss = mts["Pose Loss"]
             if affinity:
                 loss += mts["Affinity Loss"]
+            if flex:
+                loss += mts["Flex Pose Loss"]
 
             torch_scheduler.step(loss)
 
@@ -750,14 +953,15 @@ def training(args):
 
     # TODO: Add checkpoints as artifacts to MLflow
     # TODO: Save input parameters as well
-    # TODO: Save best models (lower loss)
+    # TODO: Save best models (lowest validation loss)
     to_save = {"model": model, "optimizer": optimizer}
     # Requires no checkpoint in the output directory
     # Since checkpoints are not automatically removed when restarting, it would be
     # dangerous to run without requiring the directory to have no previous checkpoints
     checkpoint = Checkpoint(
         to_save,
-        args.out_dir,
+        os.path.join(args.out_dir, args.checkpoint_dir),
+        filename_prefix=args.checkpoint_prefix,
         n_saved=args.num_checkpoints,
         global_step_transform=lambda *_: trainer.state.epoch,
     )
@@ -771,7 +975,10 @@ def training(args):
 
     trainer.run(train_loader, max_epochs=args.iterations)
 
-    metrics_train_outfile = os.path.join(args.out_dir, "metrics_train.csv")
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
+
+    metrics_train_outfile = os.path.join(args.out_dir, f"{log_root}_metrics_train.csv")
     pd.DataFrame(metrics_train).to_csv(
         metrics_train_outfile,
         float_format="%.5f",
@@ -780,7 +987,9 @@ def training(args):
     mlflogger.log_artifact(metrics_train_outfile)
 
     if args.testfile is not None:
-        metrics_test_outfile = os.path.join(args.out_dir, "metrics_test.csv")
+        metrics_test_outfile = os.path.join(
+            args.out_dir, f"{log_root}_metrics_test.csv"
+        )
         pd.DataFrame(metrics_test).to_csv(
             metrics_test_outfile,
             float_format="%.5f",

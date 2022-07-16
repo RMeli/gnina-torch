@@ -10,8 +10,10 @@ from gnina import transforms
 
 def setup_metrics(
     affinity: bool,
+    flex: bool,
     pose_loss: nn.Module,
     affinity_loss: nn.Module,
+    flexpose_loss: nn.Module,
     roc_auc: bool,
     device: torch.device,
 ) -> Dict[str, Any]:
@@ -21,11 +23,16 @@ def setup_metrics(
     Parameters
     ----------
     affinity: bool
-        Flag for affinity prediction (in addition to pose prediction)
+        Flag for affinity prediction (in addition to ligand pose prediction)
+    flex: bool
+        Flag for flexible residues pose prediction (in addition to ligand pose
+        prediction)
     pose_loss: nn.Module
         Pose loss
     affinity_loss: nn.Module
         Affinity loss
+    flexpose_loss: nn.Module
+        Flexible residues pose loss
     roc_auc: bool
         Flag for computing ROC AUC
     device: torch.device
@@ -51,6 +58,13 @@ def setup_metrics(
     if affinity_loss is not None:
         assert affinity
 
+    # Check that flexpose_loss and flex arguments are consistent
+    if flexpose_loss is not None:
+        assert flex
+
+    # Check that either affinity or flex is set
+    assert not (affinity and flex)
+
     # Pose prediction metrics
     m: Dict[str, Any] = {
         # Accuracy can be used directly without binarising the data since we are not
@@ -61,7 +75,7 @@ def setup_metrics(
         ),
         # Balanced accuracy is the average recall over all classes
         # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
-        "Balanced accuracy": metrics.Recall(
+        "Balanced Accuracy": metrics.Recall(
             average=True, output_transform=transforms.output_transform_select_pose
         ),
     }
@@ -114,6 +128,51 @@ def setup_metrics(
                     "Affinity Loss": metrics.Loss(
                         affinity_loss,
                         output_transform=transforms.output_transform_select_affinity,
+                    )
+                }
+            )
+
+    # Flexible residues pose prediction metrics
+    if flex:
+        # Pose prediction metrics
+        m.update(
+            {
+                # Accuracy can be used directly without binarising the data since we are not
+                # performing binary classification (Linear(out_features=1)) but we are
+                # performing multiclass classification with 2 classes (Linear(out_features=2))
+                "Flex Accuracy": metrics.Accuracy(
+                    output_transform=transforms.output_transform_select_flex
+                ),
+                # Balanced accuracy is the average recall over all classes
+                # https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
+                "Flex Balanced Accuracy": metrics.Recall(
+                    average=True,
+                    output_transform=transforms.output_transform_select_flex,
+                ),
+            }
+        )
+
+        if roc_auc:
+            m.update(
+                {
+                    "Flex ROC AUC": ROC_AUC(
+                        output_transform=lambda output: transforms.output_transform_ROC_flex(
+                            output
+                        ),
+                        device=device,
+                    ),
+                }
+            )
+
+        if flexpose_loss is not None:
+            # For the loss function, log_softmax is needed as opposed to softmax
+            # Use transforms.output_transform_select_log_flex instead of
+            # transforms.output_transform_select_flex
+            m.update(
+                {
+                    "Flex Pose Loss": metrics.Loss(
+                        flexpose_loss,
+                        output_transform=transforms.output_transform_select_log_flex,
                     )
                 }
             )

@@ -3,6 +3,45 @@ import torch.nn as nn
 from torch import Tensor
 
 
+class ScaledNLLLoss(nn.Module):
+    """
+    Scaled NLLLoss.
+
+    Parameters
+    ----------
+    scale: float
+        Scaling factor for the loss
+    reduction: str
+        Reduction method (mean or sum)
+    """
+
+    def __init__(
+        self,
+        scale: float = 1.0,
+        reduction: str = "mean",
+    ):
+        super().__init__()
+
+        self.scale = scale
+        self.loss = nn.NLLLoss(reduction=reduction)
+
+    def forward(self, input: Tensor, target: Tensor) -> Tensor:
+        """
+        Parameters
+        ----------
+        input: Tensor
+            Predicted values
+        target: Tensor
+            Target values
+
+        Returns
+        -------
+        torch.Tensor
+            Loss
+        """
+        return self.scale * self.loss(input, target)
+
+
 class AffinityLoss(nn.Module):
     """
     GNINA affinity loss.
@@ -63,6 +102,11 @@ class AffinityLoss(nn.Module):
             Predicted values
         target: Tensor
             Target values
+
+        Returns
+        -------
+        torch.Tensor
+            Loss
 
         Notes
         -----

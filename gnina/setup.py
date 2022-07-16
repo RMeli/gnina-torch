@@ -49,6 +49,10 @@ def setup_example_provider(
             ligmolcache=args.ligmolcache,
             recmolcache=args.recmolcache,
             stratify_receptor=args.stratify_receptor,
+            stratify_pos=args.stratify_pos,
+            stratify_max=args.stratify_max,
+            stratify_min=args.stratify_min,
+            stratify_step=args.stratify_step,
             cache_structs=True,
         )
     else:

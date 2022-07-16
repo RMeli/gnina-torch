@@ -67,6 +67,8 @@ def test_example_provider(trainfile, dataroot, device):
             "--no_shuffle",
             "--affinity_pos",
             "1",
+            "--flexlabel_pos",
+            "2",
             "-g",
             str(device),
             "--batch_size",
@@ -86,20 +88,21 @@ def test_example_provider(trainfile, dataroot, device):
 
     labels = torch.zeros(batch_size, device=device)
     affinities = torch.zeros(batch_size, device=device)
-    whatever = torch.zeros(batch_size, device=device)
+    flexlabels = torch.zeros(batch_size, device=device)
 
     assert args.label_pos == 0
     assert args.affinity_pos == 1
     batch.extract_label(args.label_pos, labels)
     batch.extract_label(args.affinity_pos, affinities)
-    batch.extract_label(2, whatever)
+    batch.extract_label(args.flexlabel_pos, flexlabels)
 
     # Labels need to be transformed from float to long
     labels = labels.long()
+    flexlabels = flexlabels.long()
 
     assert torch.allclose(labels, torch.tensor([0, 1], device=device))
     assert torch.allclose(affinities, torch.tensor([1.1, 2.1], device=device))
-    assert torch.allclose(whatever, torch.tensor([1.2, 2.2], device=device))
+    assert torch.allclose(flexlabels, torch.tensor([1, 1], device=device))
 
 
 def test_grid_maker(trainfile, dataroot, device):
@@ -135,3 +138,35 @@ def test_grid_maker(trainfile, dataroot, device):
 
     # Check that the grid has non-zero elements
     assert any(grid[grid > 0.0])
+
+
+def test_setup_example_provider_double_balance(trainfilestrat, dataroot, device):
+    # Do not shuffle examples randomly when loading the batch
+    # This ensures reproducibility
+    args = training.options(
+        [
+            trainfilestrat,
+            "-d",
+            dataroot,
+            "--no_shuffle",
+            "-g",
+            str(device),
+            "--balanced",
+            "--stratify_pos",
+            "2",
+            "--stratify_min",
+            "0",
+            "--stratify_max",
+            "1",
+            "--stratify_step",
+            "0.5",
+        ]
+    )
+
+    assert not args.shuffle
+
+    e = setup.setup_example_provider(args.trainfile, args)
+
+    assert e.num_labels() == 3  # Three labels in small.types
+    assert e.size() == 12  # Examples in small.types
+    assert e.num_types() == 28

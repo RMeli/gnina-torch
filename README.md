@@ -35,7 +35,7 @@ The `gnina` Python package has several dependencies, including:
 A full developement environment can be installed using the [conda](https://docs.conda.io/en/latest/) package manager and the provided [conda](https://docs.conda.io/en/latest/) environment file (`devtools/conda-envs/gninatorch.yaml`):
 
 ```bash
-conda create -f devtools/conda-envs/gninatorch.yaml
+conda env create -f devtools/conda-envs/gninatorch.yaml
 conda activate gninatorch
 ```
 

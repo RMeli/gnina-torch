@@ -48,6 +48,15 @@ def trainfile() -> str:
     return os.path.join(path, "data", "test.types")
 
 
+@pytest.fixture(scope="session")
+def trainfilestrat() -> str:
+    """
+    Path to small training file which allows stratification by flexible residues.
+    """
+    path = os.path.dirname(__file__)
+    return os.path.join(path, "data", "teststrat.types")
+
+
 @pytest.fixture
 def testfile() -> str:
     """

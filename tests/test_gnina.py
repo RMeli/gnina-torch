@@ -151,8 +151,12 @@ def test_gnina_model_prediction(
         ),
     ],
 )
-def test_gnina(testfile_nolabels, dataroot, model_name, capsys, CNNscore, CNNaffinity):
-    args = gnina.options([testfile_nolabels, "-d", dataroot, "--cnn", model_name])
+def test_gnina(
+    testfile_nolabels, dataroot, device, capsys, model_name, CNNscore, CNNaffinity
+):
+    args = gnina.options(
+        [testfile_nolabels, "-d", dataroot, "--cnn", model_name, "-g", str(device)]
+    )
 
     gnina.main(args)
 

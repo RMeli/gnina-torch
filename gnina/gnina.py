@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 
 import torch
 
-from gnina import models
+from gnina import dataloaders, models, setup, utils
 
 
 def _rename(key: str) -> str:
@@ -158,11 +158,18 @@ def options(args: Optional[List[str]] = None):
 
     # TODO: Allow only known keywords
     # TODO: Allow multiple models as model ensemble
+    # TODO: Default2017 model needs different ligand types
     parser.add_argument(
-        "model",
+        "--cnn",
         type=str,
-        help="Model",
-        # choices=set([k[0] for k in models.models_dict.keys()]),
+        help="Pre-trained CNN Model",
+        default="crossdock_default2018",  # TODO: change to default model ensemble
+        choices=["crossdock_default2018"]
+        + [f"crossdock_default2018_{i}" for i in range(1, 5)]
+        + ["general_default2018"]
+        + [f"general_default2018_{i}" for i in range(1, 5)]
+        + ["redock_default2018"]
+        + [f"redock_default2018_{i}" for i in range(1, 5)],
     )
 
     parser.add_argument(
@@ -179,13 +186,66 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
 
+    parser.add_argument(
+        "--ligmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for ligands",
+    )
+    parser.add_argument(
+        "--recmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for receptors",
+    )
+
     return parser.parse_args(args)
 
 
 def gnina(args):
-    _ = load_gnina_model(args.model, args.dimension, args.resolution)
+    model = load_gnina_model(args.cnn, args.dimension, args.resolution)
+
+    device = utils.set_device(args.gpu)
+    model.to(device)
+
+    example_provider = setup.setup_example_provider(args.input, args, training=False)
+    grid_maker = setup.setup_grid_maker(args)
+
+    # TODO: Allow average over different rotations
+    loader = dataloaders.GriddedExamplesLoader(
+        example_provider=example_provider,
+        grid_maker=grid_maker,
+        random_translation=0.0,  # No random translations for inference
+        random_rotation=False,  # No random rotations for inference
+        device=device,
+        grids_only=True,
+    )
+
+    for batch in loader:
+        log_pose, affinity = model(batch)
+
+        pose = torch.exp(log_pose[:, -1])
+
+        for p, a in zip(pose, affinity):
+            print(f"CNNscore: {p:.5f}")
+            print(f"CNNaffinity: {a:.5f}", "\n")
+
+
+def _intro():
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
+    logo_file = os.path.join(path, "logo")
+    with open(logo_file, "r") as f:
+        logo = f.read()
+
+    into_file = os.path.join(path, "intro")
+    with open(into_file, "r") as f:
+        intro = f.read()
+
+    print(logo, "\n\n", intro, "\n")
 
 
 if __name__ == "__main__":
+    _intro()
     args = options()
     gnina(args)

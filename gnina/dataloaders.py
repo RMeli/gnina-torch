@@ -23,6 +23,8 @@ class GriddedExamplesLoader:
         Uniform random rotation applied to each example
     device : torch.device
         Device
+    grid_only: bool
+        If True, return only the grid, otherwise return grid and labels
 
     Notes
     -----
@@ -48,6 +50,7 @@ class GriddedExamplesLoader:
         random_translation: float = 0.0,
         random_rotation: bool = False,
         device: torch.device = torch.device("cpu"),
+        grids_only: bool = False,
     ):
         # Check that example provider is populated
         assert example_provider.size() > 0
@@ -59,6 +62,7 @@ class GriddedExamplesLoader:
         self.random_translation = random_translation
         self.random_rotation = random_rotation
         self.device = device
+        self.grids_only = grids_only
 
         # Total number of examples in file
         # This is not necessarily the same as the number of examples seen in an epoch
@@ -92,34 +96,6 @@ class GriddedExamplesLoader:
 
         self.batch_idx = 0
         self.last_epoch = False
-
-    # TODO: Check this is what we want
-    # TODO: By default, epoch length is defined by len(data)
-    # TODO: If data is a finite data iterator with unknown length epoch_length
-    # TODO: will be automatically determined when data iterator is exhausted.
-    # def __len__(self):
-    #     """
-    #     Return length of the epoch (number of examples).
-
-    #     Notes
-    #     -----
-    #     The number of examples per epoch depends on the :code:`molgrid.IterationScheme`
-    #     used. Without balancing nor stratification, the number of examples per epoch is
-    #     the same for :code:`molgrid.IterationScheme.SmalleEpoch` and
-    #     :code:`molgrid.IterationScheme.LargeEpoch`. For balanced sampling, which sample
-    #     the same number of positive and negative examples, the number of examples in a
-    #     small epoch (examples seen at most once) is twice the size of the minority class
-    #     while for a large epoch (examples seen at least once) it is twice the size of
-    #     the majority class.
-    #     """
-    #     settings = self.example_provider.settings()
-
-    #     if settings.iteration_scheme == molgrid.IterationScheme.SmallEpoch:
-    #         return self.example_provider.small_epoch_size()
-    #     elif settings.iteration_scheme == molgrid.IterationScheme.LargeEpoch:
-    #         return self.example_provider.large_epoch_size()
-    #     else:
-    #         raise ValueError("Unknown iteration scheme {settings.iteration_scheme}.")
 
     def __next__(self):
         """
@@ -156,15 +132,18 @@ class GriddedExamplesLoader:
             random_rotation=self.random_rotation,
         )
 
-        batch.extract_label(self.label_pos, labels)
-        if self.affinity_pos is not None:
-            batch.extract_label(self.affinity_pos, affinities)
+        if not self.grids_only:
+            batch.extract_label(self.label_pos, labels)
+            if self.affinity_pos is not None:
+                batch.extract_label(self.affinity_pos, affinities)
 
-        # Convert labels to integers
-        # libmolgrid only supports float input
-        labels = labels.long()
+            # Convert labels to integers
+            # libmolgrid only supports float input
+            labels = labels.long()
 
-        if self.affinity_pos is None:
+        if self.grids_only:
+            return grids
+        elif self.affinity_pos is None:
             # Return grids and labels
             return grids, labels
         else:

@@ -65,6 +65,10 @@ class Default2017(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+
         self.input_dims = input_dims
 
         self.features = nn.Sequential(
@@ -73,7 +77,7 @@ class Default2017(nn.Module):
                     # unit1
                     ("unit1_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit1_conv",
+                        "unit1_conv1",
                         nn.Conv3d(
                             in_channels=input_dims[0],
                             out_channels=32,
@@ -82,11 +86,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit1_func", nn.ReLU()),
+                    ("unit1_relu1", nn.ReLU()),
                     # unit2
                     ("unit2_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit2_conv",
+                        "unit2_conv1",
                         nn.Conv3d(
                             in_channels=32,
                             out_channels=64,
@@ -95,11 +99,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit2_func", nn.ReLU()),
+                    ("unit2_relu1", nn.ReLU()),
                     # unit3
                     ("unit3_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit3_conv",
+                        "unit3_conv1",
                         nn.Conv3d(
                             in_channels=64,
                             out_channels=128,
@@ -108,7 +112,7 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit3_func", nn.ReLU()),
+                    ("unit3_relu1", nn.ReLU()),
                 ]
             )
         )
@@ -257,6 +261,11 @@ class Default2018(nn.Module):
     def __init__(self, input_dims: Tuple):
 
         super().__init__()
+
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+        self.input_dims = input_dims
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -487,7 +496,7 @@ class DenseBlock(nn.Module):
 
         super().__init__()
 
-        self.blocks = nn.ModuleList()
+        dense_dict: OrderedDict[str, nn.Module] = OrderedDict()
 
         self.in_features = in_features
         self.num_block_features = num_block_features
@@ -495,23 +504,32 @@ class DenseBlock(nn.Module):
 
         in_features_layer = in_features
         for idx in range(num_block_convs):
-            block: OrderedDict[str, nn.Module] = OrderedDict()
-            block[f"data_enc_level{tag}_batchnorm_conv{idx}"] = nn.BatchNorm3d(
-                in_features_layer,
-                affine=True,  # Same effect as "Scale" layer in Caffe
+            dense_dict.update(
+                [
+                    (
+                        f"data_enc_level{tag}_batchnorm_conv{idx}",
+                        nn.BatchNorm3d(
+                            in_features_layer,
+                            affine=True,  # Same effect as "Scale" layer in Caffe
+                        ),
+                    ),
+                    (
+                        f"data_enc_level{tag}_conv{idx}",
+                        nn.Conv3d(
+                            in_channels=in_features_layer,
+                            out_channels=num_block_features,
+                            kernel_size=3,
+                            padding=1,
+                        ),
+                    ),
+                    (f"data_enc_level{tag}_conv{idx}_relu", nn.ReLU()),
+                ]
             )
-            block[f"data_enc_level{tag}_conv{idx}"] = nn.Conv3d(
-                in_channels=in_features_layer,
-                out_channels=num_block_features,
-                kernel_size=3,
-                padding=1,
-            )
-            block[f"data_enc_level{tag}_conv{idx}_relu"] = nn.ReLU()
-
-            self.blocks.append(nn.Sequential(block))
 
             # The next layer takes all previous features as input
             in_features_layer += num_block_features
+
+        self.blocks = nn.Sequential(dense_dict)
 
     def out_features(self) -> int:
         return self.in_features + self.num_block_features * self.num_block_convs
@@ -534,12 +552,13 @@ class DenseBlock(nn.Module):
             # Forward propagation to single block
             x = block(x)
 
-            # Store current block output
-            outputs.append(x)
+            if isinstance(block, nn.ReLU):
+                # Store current block output
+                outputs.append(x)
 
-            # Concatenate all previous outputs as next input
-            # Concatenate on channels
-            x = torch.cat(outputs, dim=1)
+                # Concatenate all previous outputs as next input
+                # Concatenate on channels
+                x = torch.cat(outputs, dim=1)
 
         return x
 
@@ -581,6 +600,9 @@ class Dense(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
         self.input_dims = input_dims
 
         features: OrderedDict[str, nn.Module] = OrderedDict(

@@ -59,6 +59,24 @@ Training and inference modules try to follow the original [Caffe](https://caffe.
 
 The folder `examples` includes some complete examples for training and inference.
 
+The folder `gnina/weights` contains pre-trained models from [GNINA](https://github.com/gnina/gnina), converted from Caffe to PyTorch.
+
+### Pre-trained GNINA models
+
+Pre-trained models (`--cnn` argument in [GNINA](https://github.com/gnina/gnina)) can be easily loaded as follows:
+
+```python
+from gnina.gnina import load_gnina_model
+
+model = load_gnina_model(MODEL_NAME)
+```
+
+Inference with pre-trained [GNINA](https://github.com/gnina/gnina) models is implemented in the `gnina` module:
+
+```bash
+python -m gnina.gnina --helpss
+```
+
 ### Training
 
 Training is implemented in the `training` module:

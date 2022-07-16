@@ -162,7 +162,7 @@ def load_gnina_models(
         m = load_gnina_model(model_name, dimension=dimension, resolution=resolution)
         models_list.append(m)
 
-    return models.ModelEnsemble(models_list)
+    return models.GNINAModelEnsemble(models_list)
 
 
 def options(args: Optional[List[str]] = None):

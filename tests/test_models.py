@@ -130,39 +130,12 @@ def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs, 
 
 
 @pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
-def test_model_ensemble_pose_prediction(batch_size, dims, x, device, model):
-    m1 = models_dict[(model, False, False)](input_dims=dims).to(device)
-    m2 = models_dict[(model, False, False)](input_dims=dims).to(device)
-    m3 = models_dict[(model, False, False)](input_dims=dims).to(device)
-
-    model = models.ModelEnsemble([m1, m2, m3])
-
-    pose_log = model(x)
-
-    assert pose_log.shape == (batch_size, 2)
-
-
-@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
-def test_model_ensemble_affinity_prediction(batch_size, dims, x, device, model):
-    m1 = models_dict[(model, True, False)](input_dims=dims).to(device)
-    m2 = models_dict[(model, True, False)](input_dims=dims).to(device)
-    m3 = models_dict[(model, True, False)](input_dims=dims).to(device)
-
-    model = models.ModelEnsemble([m1, m2, m3])
-
-    pose_log, affinity = model(x)
-
-    assert pose_log.shape == (batch_size, 2)
-    assert affinity.shape == (batch_size,)
-
-
-@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
-def test_model_ensemble_average(batch_size, dims, x, device, model):
+def test_gnina_model_ensemble_average(batch_size, dims, x, device, model):
     m = models_dict[(model, True, False)](input_dims=dims).to(device)
 
-    model = models.ModelEnsemble([m, m, m])
+    model = models.GNINAModelEnsemble([m, m, m])
 
-    pose_log, affinity = model(x)
+    pose_log, affinity, _ = model(x)
 
     assert pose_log.shape == (batch_size, 2)
     assert affinity.shape == (batch_size,)

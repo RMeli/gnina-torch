@@ -1399,9 +1399,9 @@ models_dict = {
 }
 
 
-class ModelEnsemble(nn.Module):
+class GNINAModelEnsemble(nn.Module):
     """
-    Ensemble of models.
+    Ensemble of GNINA models.
 
     Parameters
     ----------
@@ -1410,11 +1410,22 @@ class ModelEnsemble(nn.Module):
 
     Notes
     -----
+    Assume models perform only pose AND affinity prediction.
+
     Modules are stored in :code:`nn.ModuleList` so that they are properly registered.
     """
 
     def __init__(self, models: List[nn.Module]):
         super().__init__()
+
+        # Check that all models allow both pose and affinity predictions
+        # These are the only models supported by GNINA so far
+        for m in models:
+            assert (
+                isinstance(m, Default2017Affinity)
+                or isinstance(m, Default2018Affinity)
+                or isinstance(m, DenseAffinity)
+            )
 
         # nn.ModuleList allows to register the different modules
         # This makes things like .to(device) apply to all modules
@@ -1429,12 +1440,9 @@ class ModelEnsemble(nn.Module):
 
         Returns
         -------
-        Union[
-            torch.tensor,
-            Tuple[torch.tensor, torch.tensor],
-            Tuple[torch.tensor, torch.tensor, torch.tensor]
-            ]
-            Output of the ensemble
+        Tuple[torch.tensor, torch.tensor, torch.tensor],
+            Logarithm of the pose score, affinity prediction (average) and affinity
+            variance
 
         Notes
         -----
@@ -1444,29 +1452,20 @@ class ModelEnsemble(nn.Module):
         score (by exponentating), compute the average, and finally return the logarithm
         of the computed average.
         """
-        # FIXME: The whole forward pass is too complex and messy
-        # FIXME: Fixing this might need a larg-ish refactoring
-
         predictions = [model(x) for model in self.models]
 
-        if isinstance(predictions[0], tuple):
-            stacked_predictions = []
+        # map(list, zip(*predictions)) transform list of multi-task predictions into
+        # list of predictions for each task
+        # [(log_pose_1, affinity_1), (log_pose_2, affinity_2), ...] =>
+        # [[log_pose_1, log_pose_2, ...], [affinity_1, affinity_2, ...]]
+        # Suggested by @IAlibay
+        # TODO: Better way to do this?
+        log_pose_all, affinity_all = tuple(map(list, zip(*predictions)))
 
-            # map(list, zip(*predictions)) transform list of multi-task predictions into
-            # list of predictions for each task
-            # [(log_pose_1, affinity_1), (log_pose_2, affinity_2), ...] =>
-            # [[log_pose_1, log_pose_2, ...], [affinity_1, affinity_2, ...]]
-            # Suggested by @IAlibay
-            # TODO: Better way to do this?
-            for pred in map(list, zip(*predictions)):
-                stacked_predictions.append(torch.stack(pred))
+        affinity_stacked = torch.stack(affinity_all)
 
-            # Pose prediction
-            stacked_predictions[0] = stacked_predictions[0].exp().mean(dim=0).log()
-            for i in range(1, len(stacked_predictions)):
-                stacked_predictions[i] = stacked_predictions[i].mean(dim=0)
+        log_pose_avg = torch.stack(log_pose_all).exp().mean(dim=0).log()
+        affinity_avg = affinity_stacked.mean(dim=0)
+        affinity_var = affinity_stacked.var(dim=0, unbiased=False)
 
-            return tuple(stacked_predictions)
-        else:
-            # Pose prediction only
-            return torch.stack(predictions).exp().mean(dim=0).log()
+        return log_pose_avg, affinity_avg, affinity_var

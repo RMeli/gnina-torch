@@ -137,27 +137,30 @@ def test_gnina_model_prediction(
 
 
 @pytest.mark.parametrize(
-    "model_name, CNNscore, CNNaffinity",
+    "model_name, CNNscore, CNNaffinity, CNNvariance",
     [
         (
             "redock_default2018",
             np.array([0.08090, 0.00871, 0.01234]),
             np.array([1.14039, 0.94944, 0.90828]),
+            np.array([0.04115, 0.09732, 0.07626]),
         ),
         (
             "general_default2018",
             np.array([0.48171, 0.46914, 0.55628]),
             np.array([1.54386, 1.50739, 1.70184]),
+            np.array([0.03959, 0.02752, 0.03837]),
         ),
         (
             "crossdock_default2018",
             np.array([0.60276, 0.29299, 0.22103]),
             np.array([1.15954, 1.07318, 0.94330]),
+            np.array([0.09806, 0.09105, 0.09067]),
         ),
     ],
 )
 def test_gnina_model_prediction_ensemble(
-    dataroot, testfile, device, model_name, CNNscore, CNNaffinity
+    dataroot, testfile, device, model_name, CNNscore, CNNaffinity, CNNvariance
 ):
     """
     Test predictions of pre-trained models against GNINA predictions.
@@ -194,10 +197,11 @@ def test_gnina_model_prediction_ensemble(
     grids, _ = next(dataset)
 
     with torch.no_grad():
-        log_pose, affinity = model(grids)
+        log_pose, affinity, affinity_var = model(grids)
 
     assert log_pose.shape == (3, 2)
     assert affinity.shape == (3,)
+    assert affinity_var.shape == (3,)
 
     assert torch.allclose(
         torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
@@ -210,6 +214,9 @@ def test_gnina_model_prediction_ensemble(
 
     assert np.allclose(negative_score, 1 - CNNscore, atol=1e-6)
     assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
+
+    # Compare 1-affinity_var because variance is expected to be small
+    assert np.allclose(1 - affinity_var.cpu().numpy(), 1 - CNNvariance, atol=1e-6)
 
 
 @pytest.mark.parametrize(

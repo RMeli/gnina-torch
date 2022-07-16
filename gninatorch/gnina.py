@@ -5,6 +5,7 @@ from typing import List, Optional, Union
 
 import torch
 
+import gninatorch
 from gninatorch import dataloaders, models, setup, utils
 
 
@@ -145,6 +146,25 @@ def load_gnina_model(
     return _load_gnina_model_file(gnina_model_file, num_voxels)
 
 
+def load_gnina_models(
+    model_names: List[str], dimension: float = 23.5, resolution: float = 0.5
+):
+    """
+    Load GNINA models.
+
+    Parameters
+    ----------
+    model_names: List[str]
+        List of GNINA model names
+    """
+    models_list = []
+    for model_name in model_names:
+        m = load_gnina_model(model_name, dimension=dimension, resolution=resolution)
+        models_list.append(m)
+
+    return models.ModelEnsemble(models_list)
+
+
 def options(args: Optional[List[str]] = None):
     """
     Define options and parse arguments.
@@ -261,7 +281,8 @@ def _header():
     with open(into_file, "r") as f:
         intro = f.read()
 
-    print(logo, "\n\n", intro, "\n")
+    print(logo, "\n\n", intro)
+    print(f"Version: {gninatorch.__version__} ({gninatorch.__git_revision__})\n")
 
 
 if __name__ == "__main__":

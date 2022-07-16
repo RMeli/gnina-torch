@@ -122,6 +122,87 @@ def test_gnina_model_prediction(
     assert log_pose.shape == (3, 2)
     assert affinity.shape == (3,)
 
+    # Check that scores sum to one
+    assert torch.allclose(
+        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
+    )
+
+    # Select scores of the negative class
+    # This is mainly because for the fictitious test systems the score is really low
+    # Small scores (close to zero) do not play nicely with np.allclose
+    negative_score = torch.exp(log_pose)[:, 0].cpu().numpy()
+
+    assert np.allclose(negative_score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "model_name, CNNscore, CNNaffinity",
+    [
+        (
+            "redock_default2018",
+            np.array([0.08090, 0.00871, 0.01234]),
+            np.array([1.14039, 0.94944, 0.90828]),
+        ),
+        (
+            "general_default2018",
+            np.array([0.48171, 0.46914, 0.55628]),
+            np.array([1.54386, 1.50739, 1.70184]),
+        ),
+        (
+            "crossdock_default2018",
+            np.array([0.60276, 0.29299, 0.22103]),
+            np.array([1.15954, 1.07318, 0.94330]),
+        ),
+    ],
+)
+def test_gnina_model_prediction_ensemble(
+    dataroot, testfile, device, model_name, CNNscore, CNNaffinity
+):
+    """
+    Test predictions of pre-trained models against GNINA predictions.
+
+    Notes
+    -----
+    GNINA has been running as follows in order to generate the baseline:
+
+    gnina -r tests/data/mols/r1.pdb -l tests/data/mols/l1.sdf --score_only --cnn MODEL_ensemble
+    gnina -r tests/data/mols/r2.pdb -l tests/data/mols/l2.sdf --score_only --cnn MODEL_ensemble
+    gnina -r tests/data/mols/r1.pdb -l tests/data/mols/l2.sdf --score_only --cnn MODEL_ensemble
+    """
+    model = gnina.load_gnina_models(
+        [model_name] + [f"{model_name}_{i}" for i in range(1, 5)]
+    )
+    model.to(device)
+    model.eval()
+
+    ep = molgrid.ExampleProvider(
+        data_root=dataroot,
+        balanced=False,
+        shuffle=False,
+        default_batch_size=3,
+        iteration_scheme=molgrid.IterationScheme.SmallEpoch,
+    )
+    ep.populate(testfile)
+
+    gmaker = molgrid.GridMaker(resolution=0.5, dimension=23.5)
+
+    dataset = GriddedExamplesLoader(
+        example_provider=ep, grid_maker=gmaker, device=device
+    )
+
+    grids, _ = next(dataset)
+
+    with torch.no_grad():
+        log_pose, affinity = model(grids)
+
+    assert log_pose.shape == (3, 2)
+    assert affinity.shape == (3,)
+
+    assert torch.allclose(
+        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
+    )
+
     # Select scores of the negative class
     # This is mainly because for the fictitious test systems the score is really low
     # Small scores (close to zero) do not play nicely with np.allclose

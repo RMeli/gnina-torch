@@ -1400,10 +1400,25 @@ models_dict = {
 
 
 class ModelEnsemble(nn.Module):
+    """
+    Ensemble of models.
+
+    Parameters
+    ----------
+    models: List[nn.Module]
+        List of models to use in the ensemble
+
+    Notes
+    -----
+    Modules are stored in :code:`nn.ModuleList` so that they are properly registered.
+    """
+
     def __init__(self, models: List[nn.Module]):
         super().__init__()
 
-        self.models = models
+        # nn.ModuleList allows to register the different modules
+        # This makes things like .to(device) apply to all modules
+        self.models = nn.ModuleList(models)
 
     def forward(self, x: torch.Tensor):
         """
@@ -1411,13 +1426,47 @@ class ModelEnsemble(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        Union[
+            torch.tensor,
+            Tuple[torch.tensor, torch.tensor],
+            Tuple[torch.tensor, torch.tensor, torch.tensor]
+            ]
+            Output of the ensemble
+
+        Notes
+        -----
+        For pose prediction, the average has to be performed on the scores, not theeir
+        logarithm (returned by the model). In order to be consistent with everywhere
+        else (where the logarighm of the prediction is returned), here we compute the
+        score (by exponentating), compute the average, and finally return the logarithm
+        of the computed average.
         """
+        # FIXME: The whole forward pass is too complex and messy
+        # FIXME: Fixing this might need a larg-ish refactoring
+
         predictions = [model(x) for model in self.models]
 
         if isinstance(predictions[0], tuple):
             stacked_predictions = []
+
+            # map(list, zip(*predictions)) transform list of multi-task predictions into
+            # list of predictions for each task
+            # [(log_pose_1, affinity_1), (log_pose_2, affinity_2), ...] =>
+            # [[log_pose_1, log_pose_2, ...], [affinity_1, affinity_2, ...]]
+            # Suggested by @IAlibay
+            # TODO: Better way to do this?
             for pred in map(list, zip(*predictions)):
-                stacked_predictions.append(torch.stack(pred).mean(dim=0))
+                stacked_predictions.append(torch.stack(pred))
+
+            # Pose prediction
+            stacked_predictions[0] = stacked_predictions[0].exp().mean(dim=0).log()
+            for i in range(1, len(stacked_predictions)):
+                stacked_predictions[i] = stacked_predictions[i].mean(dim=0)
+
             return tuple(stacked_predictions)
         else:
-            return torch.stack(predictions).mean(dim=0)
+            # Pose prediction only
+            return torch.stack(predictions).exp().mean(dim=0).log()

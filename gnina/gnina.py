@@ -131,6 +131,10 @@ def load_gnina_model(
     ----------
     gnina_model: str
         GNINA model name
+    dimension: float
+        Grid dimension (in Angstrom)
+    resolution: float
+        Grid resolution (in Angstrom)
     """
     path = os.path.dirname(os.path.abspath(__file__))
     gnina_model_file = os.path.join(path, "weights", f"{gnina_model}.pt")
@@ -203,6 +207,14 @@ def options(args: Optional[List[str]] = None):
 
 
 def main(args):
+    """
+    Run inference with GNINA pre-trained models.
+
+    Parameters
+    ----------
+    args: Namespace
+        Parsed command line arguments
+    """
     model = load_gnina_model(args.cnn, args.dimension, args.resolution)
 
     device = utils.set_device(args.gpu)
@@ -231,7 +243,14 @@ def main(args):
             print(f"CNNaffinity: {a:.5f}", "\n")
 
 
-def _intro():
+def _header():
+    """
+    Print GNINA header.
+
+    Notes
+    -----
+    The header includes an ASCII art logo, and the relevant references.
+    """
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
     logo_file = os.path.join(path, "logo")
@@ -246,6 +265,6 @@ def _intro():
 
 
 if __name__ == "__main__":
-    _intro()
+    _header()
     args = options()
     main(args)

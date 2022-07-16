@@ -45,19 +45,29 @@ Once the [conda](https://docs.conda.io/en/latest/) environment is created and ac
 python -m pip install .
 ```
 
-### Tests
-
-In order to check the installation, unit tests are provided and can be run with [pytest](https://docs.pytest.org/):
-
-```bash
-pytest --cov=gnina
-```
-
 ## Usage
 
 Training and inference modules try to follow the original [Caffe](https://caffe.berkeleyvision.org/) implementation of [gnina/scripts](https://github.com/gnina/scripts), however not all features are implemented.
 
 The folder `examples` includes some complete examples for training and inference.
+
+The folder `gnina/weights` contains pre-trained models from [GNINA](https://github.com/gnina/gnina), converted from Caffe to PyTorch.
+
+### Pre-trained GNINA models
+
+Pre-trained models (`--cnn` argument in [GNINA](https://github.com/gnina/gnina)) can be easily loaded as follows:
+
+```python
+from gnina.gnina import load_gnina_model
+
+model = load_gnina_model(MODEL_NAME)
+```
+
+Inference with pre-trained [GNINA](https://github.com/gnina/gnina) models is implemented in the `gnina` module:
+
+```bash
+python -m gnina.gnina --helpss
+```
 
 ### Training
 
@@ -73,6 +83,14 @@ Inference is implemented in the `inference` module:
 
 ```bash
 python -m gnina.inference --help
+```
+
+### Tests
+
+In order to check the installation, unit tests are provided and can be run with [pytest](https://docs.pytest.org/):
+
+```bash
+pytest --cov=gnina
 ```
 
 ## Acknowledgments

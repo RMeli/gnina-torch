@@ -108,6 +108,12 @@ def options(args: Optional[List[str]] = None):
         help="Disable CSV output",
         dest="csv",
     )
+    parser.add_argument(
+        "--no_cache",
+        action="store_false",
+        help="Disable structure caching",
+        dest="cache_structures",
+    )
 
     return parser.parse_args(args)
 

@@ -63,7 +63,7 @@ The folder `gninatorch/weights` contains pre-trained models from [GNINA](https:/
 
 ### Pre-trained GNINA models
 
-Pre-trained models (`--cnn` argument in [GNINA](https://github.com/gnina/gnina)) can be easily loaded as follows:
+Pre-trained GNINA models can be loaded as follows:
 
 ```python
 from gninatorch.gnina import load_gnina_model
@@ -71,7 +71,17 @@ from gninatorch.gnina import load_gnina_model
 model = load_gnina_model(MODEL_NAME)
 ```
 
-Inference with pre-trained [GNINA](https://github.com/gnina/gnina) models is implemented in the `gnina` module:
+Pre-trainde GNINA models can be loades as an ensemble as follows:
+
+```python
+from gninatorch.gnina import load_gnina_models
+
+model_ensemble = load_gnina_models([MODEL_NAME_1, MODEL_NAME_2, ...])
+```
+
+A single model will return `log_CNNscore` and `CNNaffinity`, while an ensemble of models will return `log_CNNscore`, `CNNaffinity`, and `CNNvariance`.
+
+Inference with pre-trained [GNINA](https://github.com/gnina/gnina) models (`--cnn` argument in [GNINA](https://github.com/gnina/gnina)) is implemented in the `gnina` module:
 
 ```bash
 python -m gninatorch.gnina --help

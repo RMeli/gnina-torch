@@ -260,3 +260,61 @@ def test_gnina(
 
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
     assert np.allclose(affinity, CNNaffinity, atol=1e-6)
+
+
+@pytest.mark.parametrize(
+    "model_name, CNNscore, CNNaffinity, CNNvariance",
+    [
+        (
+            "redock_default2018_ensemble",
+            np.array([0.08090, 0.00871, 0.01234]),
+            np.array([1.14039, 0.94944, 0.90828]),
+            np.array([0.04115, 0.09732, 0.07626]),
+        ),
+        (
+            "general_default2018_ensemble",
+            np.array([0.48171, 0.46914, 0.55628]),
+            np.array([1.54386, 1.50739, 1.70184]),
+            np.array([0.03959, 0.02752, 0.03837]),
+        ),
+        (
+            "crossdock_default2018_ensemble",
+            np.array([0.60276, 0.29299, 0.22103]),
+            np.array([1.15954, 1.07318, 0.94330]),
+            np.array([0.09806, 0.09105, 0.09067]),
+        ),
+    ],
+)
+def test_gnina_ensemble(
+    testfile_nolabels,
+    dataroot,
+    device,
+    capsys,
+    model_name,
+    CNNscore,
+    CNNaffinity,
+    CNNvariance,
+):
+    args = gnina.options(
+        [testfile_nolabels, "-d", dataroot, "--cnn", model_name, "-g", str(device)]
+    )
+
+    gnina.main(args)
+
+    captured = capsys.readouterr()
+    assert "CNNscore" in captured.out
+    assert "CNNaffinity" in captured.out
+    assert "CNNvariance" in captured.out
+
+    score_re = re.findall(r"CNNscore: (.*)", captured.out)
+    score = np.array([float(s) for s in score_re])
+
+    affinity_re = re.findall(r"CNNaffinity: (.*)", captured.out)
+    affinity = np.array([float(s) for s in affinity_re])
+
+    variance_re = re.findall(r"CNNvariance: (.*)", captured.out)
+    variance = np.array([float(s) for s in variance_re])
+
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(affinity, CNNaffinity, atol=1e-6)
+    assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-6)

@@ -261,6 +261,13 @@ def options(args: Optional[List[str]] = None):
         dest="roc_auc",
     )
 
+    parser.add_argument(
+        "--no_cache",
+        action="store_false",
+        help="Disable structure caching",
+        dest="cache_structures",
+    )
+
     parser.add_argument("-s", "--seed", type=int, default=None, help="Random seed")
     parser.add_argument("--silent", action="store_true", help="No console output")
 

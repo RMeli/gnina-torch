@@ -53,7 +53,7 @@ def setup_example_provider(
             stratify_max=args.stratify_max,
             stratify_min=args.stratify_min,
             stratify_step=args.stratify_step,
-            cache_structs=True,
+            cache_structs=args.cache_structures,
         )
     else:
         # Use command line option for training
@@ -66,7 +66,7 @@ def setup_example_provider(
             ligmolcache=args.ligmolcache,
             recmolcache=args.recmolcache,
             stratify_receptor=False,
-            cache_structs=True,
+            cache_structs=args.cache_structures,
         )
 
     example_provider.populate(examples_file)

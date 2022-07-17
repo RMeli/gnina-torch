@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import torch
 
+import gninatorch
 from gninatorch import gnina, models
 from gninatorch.dataloaders import GriddedExamplesLoader
 
@@ -318,3 +319,12 @@ def test_gnina_ensemble(
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
     assert np.allclose(affinity, CNNaffinity, atol=1e-6)
     assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-6)
+
+
+def test_header(capsys):
+    gnina._header()
+
+    captured = capsys.readouterr()
+
+    assert gninatorch.__version__ in captured.out
+    assert gninatorch.__git_revision__ in captured.out

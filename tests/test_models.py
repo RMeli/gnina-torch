@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from gninatorch import models
 from gninatorch.models import DenseBlock, models_dict
 
 
@@ -126,3 +127,20 @@ def test_denseblock_forward(batch_size, x, num_block_features, num_block_convs, 
     assert x.shape[1] == num_block_features * num_block_convs + in_features
     assert x.shape[1] == block.out_features()
     assert x.shape[0] == batch_size
+
+
+@pytest.mark.parametrize("model", ["default2017", "default2018", "dense"])
+def test_gnina_model_ensemble_average(batch_size, dims, x, device, model):
+    m = models_dict[(model, True, False)](input_dims=dims).to(device)
+
+    model = models.GNINAModelEnsemble([m, m, m])
+
+    pose_log, affinity, _ = model(x)
+
+    assert pose_log.shape == (batch_size, 2)
+    assert affinity.shape == (batch_size,)
+
+    # Check that average of three identical models is the same as the original model
+    pose_log_m, affinity_m = m(x)
+    assert torch.allclose(pose_log, pose_log_m)
+    assert torch.allclose(affinity, affinity_m)

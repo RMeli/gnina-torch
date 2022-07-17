@@ -1,10 +1,12 @@
 import argparse
 import os
 from collections import OrderedDict
-from typing import List, Optional, Union
+from typing import Iterable, List, Optional, Union
 
 import torch
+from torch import nn
 
+import gninatorch
 from gninatorch import dataloaders, models, setup, utils
 
 
@@ -145,6 +147,25 @@ def load_gnina_model(
     return _load_gnina_model_file(gnina_model_file, num_voxels)
 
 
+def load_gnina_models(
+    model_names: Iterable[str], dimension: float = 23.5, resolution: float = 0.5
+):
+    """
+    Load GNINA models.
+
+    Parameters
+    ----------
+    model_names: Iterable[str]
+        List of GNINA model names
+    """
+    models_list = []
+    for model_name in model_names:
+        m = load_gnina_model(model_name, dimension=dimension, resolution=resolution)
+        models_list.append(m)
+
+    return models.GNINAModelEnsemble(models_list)
+
+
 def options(args: Optional[List[str]] = None):
     """
     Define options and parse arguments.
@@ -160,19 +181,17 @@ def options(args: Optional[List[str]] = None):
 
     parser.add_argument("input", type=str, help="Input file for inference")
 
-    # TODO: Allow only known keywords
-    # TODO: Allow multiple models as model ensemble
     # TODO: Default2017 model needs different ligand types
     parser.add_argument(
         "--cnn",
         type=str,
         help="Pre-trained CNN Model",
-        default="crossdock_default2018",  # TODO: change to default model ensemble
-        choices=["crossdock_default2018"]
+        default="crossdock_default2018_ensemble",  # TODO: change to default model ensemble
+        choices=[f"crossdock_default2018{tag}" for tag in ["", "_ensemble"]]
         + [f"crossdock_default2018_{i}" for i in range(1, 5)]
-        + ["general_default2018"]
+        + [f"general_default2018{tag}" for tag in ["", "_ensemble"]]
         + [f"general_default2018_{i}" for i in range(1, 5)]
-        + ["redock_default2018"]
+        + [f"redock_default2018{tag}" for tag in ["", "_ensemble"]]
         + [f"redock_default2018_{i}" for i in range(1, 5)],
     )
 
@@ -206,6 +225,43 @@ def options(args: Optional[List[str]] = None):
     return parser.parse_args(args)
 
 
+def _setup_gnina_model(cnn: str, dimension: float, resolution: float) -> nn.Module:
+    """
+    Load model or ensemble of models.
+
+    Parameters
+    ----------
+    cnn: str
+        CNN model name
+    dimension: float
+        Grid dimension
+    resolution: float
+        Grid resolution
+
+    Returns
+    -------
+    nn.Module
+        Model or ensemble of models
+
+    Notes
+    -----
+    Mimicks GNINA CLI.
+    """
+    ensemble = False
+    if "ensemble" in cnn:
+        ensemble = True
+
+        name = cnn.replace("_ensemble", "")
+        names = [name] + [f"{name}_{i}" for i in range(1, 5)]
+
+        # Load model as an ensemble
+        model = load_gnina_models(names, dimension, resolution)
+    else:
+        model = load_gnina_model(cnn)
+
+    return model, ensemble
+
+
 def main(args):
     """
     Run inference with GNINA pre-trained models.
@@ -215,7 +271,7 @@ def main(args):
     args: Namespace
         Parsed command line arguments
     """
-    model = load_gnina_model(args.cnn, args.dimension, args.resolution)
+    model, ensemble = _setup_gnina_model(args.cnn, args.dimension, args.resolution)
 
     device = utils.set_device(args.gpu)
     model.to(device)
@@ -234,13 +290,19 @@ def main(args):
     )
 
     for batch in loader:
-        log_pose, affinity = model(batch)
+        if not ensemble:
+            log_pose, affinity = model(batch)
+        else:
+            log_pose, affinity, affinity_var = model(batch)
 
         pose = torch.exp(log_pose[:, -1])
 
-        for p, a in zip(pose, affinity):
+        for i, (p, a) in enumerate(zip(pose, affinity)):
             print(f"CNNscore: {p:.5f}")
-            print(f"CNNaffinity: {a:.5f}", "\n")
+            print(f"CNNaffinity: {a:.5f}")
+            if ensemble:
+                print(f"CNNvariance: {affinity_var[i]:.5f}")
+            print("")
 
 
 def _header():
@@ -261,7 +323,8 @@ def _header():
     with open(into_file, "r") as f:
         intro = f.read()
 
-    print(logo, "\n\n", intro, "\n")
+    print(logo, "\n\n", intro)
+    print(f"Version: {gninatorch.__version__} ({gninatorch.__git_revision__})\n")
 
 
 if __name__ == "__main__":

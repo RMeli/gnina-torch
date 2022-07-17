@@ -14,7 +14,7 @@ connected layer instead of the softmax.
 """
 
 from collections import OrderedDict, namedtuple
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -1397,3 +1397,75 @@ models_dict = {
     Model("hires_pose", True, False): HiResPose,
     Model("hires_affinity", True, False): HiResAffinity,
 }
+
+
+class GNINAModelEnsemble(nn.Module):
+    """
+    Ensemble of GNINA models.
+
+    Parameters
+    ----------
+    models: List[nn.Module]
+        List of models to use in the ensemble
+
+    Notes
+    -----
+    Assume models perform only pose AND affinity prediction.
+
+    Modules are stored in :code:`nn.ModuleList` so that they are properly registered.
+    """
+
+    def __init__(self, models: List[nn.Module]):
+        super().__init__()
+
+        # Check that all models allow both pose and affinity predictions
+        # These are the only models supported by GNINA so far
+        for m in models:
+            assert (
+                isinstance(m, Default2017Affinity)
+                or isinstance(m, Default2018Affinity)
+                or isinstance(m, DenseAffinity)
+            )
+
+        # nn.ModuleList allows to register the different modules
+        # This makes things like .to(device) apply to all modules
+        self.models = nn.ModuleList(models)
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        Tuple[torch.tensor, torch.tensor, torch.tensor],
+            Logarithm of the pose score, affinity prediction (average) and affinity
+            variance
+
+        Notes
+        -----
+        For pose prediction, the average has to be performed on the scores, not theeir
+        logarithm (returned by the model). In order to be consistent with everywhere
+        else (where the logarighm of the prediction is returned), here we compute the
+        score (by exponentating), compute the average, and finally return the logarithm
+        of the computed average.
+        """
+        predictions = [model(x) for model in self.models]
+
+        # map(list, zip(*predictions)) transform list of multi-task predictions into
+        # list of predictions for each task
+        # [(log_pose_1, affinity_1), (log_pose_2, affinity_2), ...] =>
+        # [[log_pose_1, log_pose_2, ...], [affinity_1, affinity_2, ...]]
+        # Suggested by @IAlibay
+        # TODO: Better way to do this?
+        log_pose_all, affinity_all = tuple(map(list, zip(*predictions)))
+
+        affinity_stacked = torch.stack(affinity_all)
+
+        log_pose_avg = torch.stack(log_pose_all).exp().mean(dim=0).log()
+        affinity_avg = affinity_stacked.mean(dim=0)
+        affinity_var = affinity_stacked.var(dim=0, unbiased=False)
+
+        return log_pose_avg, affinity_avg, affinity_var

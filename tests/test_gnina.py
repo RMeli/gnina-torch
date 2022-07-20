@@ -259,10 +259,10 @@ def test_gnina(
     affinity_re = re.findall(r"CNNaffinity: (.*)", captured.out)
     affinity = np.array([float(s) for s in affinity_re])
 
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
     # CI sometimes fail with 0.43468 instead of 0.43467
     # atol reduced to 1e-5 to avoid this random failure (numerical errors)
-    assert np.allclose(affinity, CNNaffinity, atol=1e-5)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
+    assert np.allclose(affinity, CNNaffinity, atol=1e-6)
 
 
 @pytest.mark.parametrize(

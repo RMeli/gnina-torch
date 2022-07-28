@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 import torch
+from torch import nn
 
-from gnina import losses
+from gninatorch import losses
 
 
 def test_affinity_loss_perfect_predictions(device):
@@ -129,3 +130,27 @@ def test_affinity_loss_underestimated_predicted_affinity_bad_pose_sum_L2(device)
 
     # Underestimated affinity for a bad pose does not contribute to the loss
     assert criterion(predicted, target).item() == pytest.approx(0.0)
+
+
+def test_nllloss_scaled_null(device):
+    criterion = losses.ScaledNLLLoss()
+
+    tt = torch.tensor([0, 0, 1, 1, 0], device=device)
+    it = torch.tensor(
+        [[0.0, 1.0], [0.0, 1.0], [1.0, 0.0], [0.1, 0.0], [0.0, 1.0]], device=device
+    )
+    assert criterion(it, tt).item() == pytest.approx(0.0)
+
+
+def test_nllloss_scaled(device):
+    scale = 0.5
+
+    loss = losses.ScaledNLLLoss(scale=0.5)
+    unscaled_loss = nn.NLLLoss()
+
+    tt = torch.tensor([0, 0, 1, 1, 0], device=device)
+    it = torch.tensor(
+        [[0.9, 0.1], [0.2, 0.8], [0.7, 0.3], [0.2, 0.8], [0.2, 0.8]], device=device
+    )
+
+    assert loss(it, tt).item() == pytest.approx(scale * unscaled_loss(it, tt).item())

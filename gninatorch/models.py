@@ -6,15 +6,15 @@ Notes
 The PyTorch models try to follow the original Caffe models as much as possible. However,
 some changes are necessary.
 
-The :code:`MolDataLayer` is now separated from the model and the parameters are
+Notable differences:
+* The :code:`MolDataLayer` is now separated from the model and the parameters are
 controlled by CLI arguments in the training process.
-
-The model output for pose prediction corresponds to the log softmax of the last fully-
+* The model output for pose prediction corresponds to the log softmax of the last fully-
 connected layer instead of the softmax.
 """
 
-from collections import OrderedDict
-from typing import Tuple, Union
+from collections import OrderedDict, namedtuple
+from typing import List, Tuple, Union
 
 import torch
 import torch.nn.functional as F
@@ -65,6 +65,10 @@ class Default2017(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+
         self.input_dims = input_dims
 
         self.features = nn.Sequential(
@@ -73,7 +77,7 @@ class Default2017(nn.Module):
                     # unit1
                     ("unit1_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit1_conv",
+                        "unit1_conv1",
                         nn.Conv3d(
                             in_channels=input_dims[0],
                             out_channels=32,
@@ -82,11 +86,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit1_func", nn.ReLU()),
+                    ("unit1_relu1", nn.ReLU()),
                     # unit2
                     ("unit2_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit2_conv",
+                        "unit2_conv1",
                         nn.Conv3d(
                             in_channels=32,
                             out_channels=64,
@@ -95,11 +99,11 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit2_func", nn.ReLU()),
+                    ("unit2_relu1", nn.ReLU()),
                     # unit3
                     ("unit3_pool", nn.MaxPool3d(kernel_size=2, stride=2)),
                     (
-                        "unit3_conv",
+                        "unit3_conv1",
                         nn.Conv3d(
                             in_channels=64,
                             out_channels=128,
@@ -108,7 +112,7 @@ class Default2017(nn.Module):
                             padding=1,
                         ),
                     ),
-                    ("unit3_func", nn.ReLU()),
+                    ("unit3_relu1", nn.ReLU()),
                 ]
             )
         )
@@ -162,6 +166,11 @@ class Default2017Pose(Default2017):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
 
         Notes
         -----
@@ -219,6 +228,11 @@ class Default2017Affinity(Default2017Pose):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -234,6 +248,82 @@ class Default2017Affinity(Default2017Pose):
         # Squeeze last (dummy) dimension of affinity prediction
         # This allows to match the shape (batch_size,) of the target tensor
         return pose_log, affinity.squeeze(-1)
+
+
+class Default2017Flex(Default2017):
+    """
+    GNINA default2017 model architecture for multi-task pose prediction (ligand and
+    flexible residues).
+
+    Poses are annotated based on both ligand RMSD and flexible residues RMSD (w.r.t. the
+    cognate receptor in the case of cross-docking).
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for ligand pose prediction
+        self.lig_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "lig_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for flexible residues pose prediction
+        self.flex_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "flex_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and flexible residues pose prediction
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and flexible residues pose prediction
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+
+        x = self.features(x)
+        x = x.view(-1, self.features_out_size)
+
+        lig_pose_raw = self.lig_pose(x)
+        lig_pose_log = F.log_softmax(lig_pose_raw, dim=1)
+
+        flex_pose_raw = self.flex_pose(x)
+        flex_pose_log = F.log_softmax(flex_pose_raw, dim=1)
+
+        return lig_pose_log, flex_pose_log
 
 
 class Default2018(nn.Module):
@@ -257,6 +347,11 @@ class Default2018(nn.Module):
     def __init__(self, input_dims: Tuple):
 
         super().__init__()
+
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
+        self.input_dims = input_dims
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -353,7 +448,7 @@ class Default2018Pose(Default2018):
 
     Notes
     -----
-    This architectre was translated from the following Caffe model:
+    This architecture was translated from the following Caffe model:
 
         https://github.com/gnina/models/blob/master/crossdocked_paper/default2018.model
 
@@ -382,6 +477,11 @@ class Default2018Pose(Default2018):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
 
         Notes
         -----
@@ -438,6 +538,11 @@ class Default2018Affinity(Default2018Pose):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -453,6 +558,77 @@ class Default2018Affinity(Default2018Pose):
         # Squeeze last (dummy) dimension of affinity prediction
         # This allows to match the shape (batch_size,) of the target tensor
         return pose_log, affinity.squeeze(-1)
+
+
+class Default2018Flex(Default2018):
+    """
+    GNINA default2017 model architecture for multi-task pose prediction (ligand and
+    flexible residues).
+
+    Poses are annotated based on both ligand RMSD and flexible residues RMSD (w.r.t. the
+    cognate receptor in the case of cross-docking).
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    """
+
+    def __init__(self, input_dims: Tuple):
+
+        super().__init__(input_dims)
+
+        # Linear layer for ligand pose prediction
+        self.lig_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "lig_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for flexible residues pose prediction
+        self.flex_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "flex_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and flexible residues pose prediction
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+
+        x = self.features(x)
+        x = x.view(-1, self.features_out_size)
+
+        lig_pose_raw = self.lig_pose(x)
+        lig_pose_log = F.log_softmax(lig_pose_raw, dim=1)
+
+        flex_pose_raw = self.flex_pose(x)
+        flex_pose_log = F.log_softmax(flex_pose_raw, dim=1)
+
+        return lig_pose_log, flex_pose_log
 
 
 class DenseBlock(nn.Module):
@@ -487,7 +663,7 @@ class DenseBlock(nn.Module):
 
         super().__init__()
 
-        self.blocks = nn.ModuleList()
+        dense_dict: OrderedDict[str, nn.Module] = OrderedDict()
 
         self.in_features = in_features
         self.num_block_features = num_block_features
@@ -495,23 +671,32 @@ class DenseBlock(nn.Module):
 
         in_features_layer = in_features
         for idx in range(num_block_convs):
-            block: OrderedDict[str, nn.Module] = OrderedDict()
-            block[f"data_enc_level{tag}_batchnorm_conv{idx}"] = nn.BatchNorm3d(
-                in_features_layer,
-                affine=True,  # Same effect as "Scale" layer in Caffe
+            dense_dict.update(
+                [
+                    (
+                        f"data_enc_level{tag}_batchnorm_conv{idx}",
+                        nn.BatchNorm3d(
+                            in_features_layer,
+                            affine=True,  # Same effect as "Scale" layer in Caffe
+                        ),
+                    ),
+                    (
+                        f"data_enc_level{tag}_conv{idx}",
+                        nn.Conv3d(
+                            in_channels=in_features_layer,
+                            out_channels=num_block_features,
+                            kernel_size=3,
+                            padding=1,
+                        ),
+                    ),
+                    (f"data_enc_level{tag}_conv{idx}_relu", nn.ReLU()),
+                ]
             )
-            block[f"data_enc_level{tag}_conv{idx}"] = nn.Conv3d(
-                in_channels=in_features_layer,
-                out_channels=num_block_features,
-                kernel_size=3,
-                padding=1,
-            )
-            block[f"data_enc_level{tag}_conv{idx}_relu"] = nn.ReLU()
-
-            self.blocks.append(nn.Sequential(block))
 
             # The next layer takes all previous features as input
             in_features_layer += num_block_features
+
+        self.blocks = nn.Sequential(dense_dict)
 
     def out_features(self) -> int:
         return self.in_features + self.num_block_features * self.num_block_convs
@@ -522,6 +707,11 @@ class DenseBlock(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Output tensor
         """
 
         # TODO: Make more efficient by keeping concatenated outputs
@@ -534,12 +724,13 @@ class DenseBlock(nn.Module):
             # Forward propagation to single block
             x = block(x)
 
-            # Store current block output
-            outputs.append(x)
+            if isinstance(block, nn.ReLU):
+                # Store current block output
+                outputs.append(x)
 
-            # Concatenate all previous outputs as next input
-            # Concatenate on channels
-            x = torch.cat(outputs, dim=1)
+                # Concatenate all previous outputs as next input
+                # Concatenate on channels
+                x = torch.cat(outputs, dim=1)
 
         return x
 
@@ -566,7 +757,7 @@ class Dense(nn.Module):
 
         https://github.com/gnina/models/blob/master/pytorch/dense_model.py
 
-    The main difference is that the original implementation resurns the raw output of
+    The main difference is that the original implementation returns the raw output of
     the last linear layer while here the output is the log softmax of the last linear.
     """
 
@@ -581,6 +772,9 @@ class Dense(nn.Module):
 
         super().__init__()
 
+        assert (
+            len(input_dims) == 4
+        ), "Input dimensions must be (channels, depth, height, width)"
         self.input_dims = input_dims
 
         features: OrderedDict[str, nn.Module] = OrderedDict(
@@ -656,6 +850,14 @@ class Dense(nn.Module):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Raises
+        ------
+        NotImplementedError
+
+        Notes
+        -----
+        The forward pass needs to be implemented in derived classes.
         """
         raise NotImplementedError
 
@@ -714,6 +916,11 @@ class DensePose(Dense):
         ----------
         x: torch.Tensor
             Input tensor
+
+        Returns
+        -------
+        torch.Tensor
+            Log probabilities for ligand pose
 
         Notes
         -----
@@ -786,6 +993,11 @@ class DenseAffinity(DensePose):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -803,6 +1015,101 @@ class DenseAffinity(DensePose):
         # Squeeze last (dummy) dimension of affinity prediction
         # This allows to match the shape (batch_size,) of the target tensor
         return pose_log, affinity.squeeze(-1)
+
+
+class DenseFlex(Dense):
+    """
+    GNINA dense model architecture for multi-task pose prediction (ligand and
+    flexible residues).
+
+    Poses are annotated based on both ligand RMSD and flexible residues RMSD (w.r.t. the
+    cognate receptor in the case of cross-docking).
+
+    Parameters
+    ----------
+    input_dims: tuple
+        Model input dimensions (channels, depth, height, width)
+    num_blocks: int
+        Number of dense blocks
+    num_block_features: int
+        Number of features in dense block convolutions
+    num_block_convs" int
+        Number of convolutions in dense block
+
+
+    Notes
+    -----
+    Original implementation by Andrew McNutt available here:
+
+        https://github.com/gnina/models/blob/master/pytorch/dense_model.py
+
+    The main difference is that the original implementation resurns the raw output of
+    the last linear layer while here the output is the log softmax of the last linear.
+    """
+
+    def __init__(
+        self,
+        input_dims: Tuple,
+        num_blocks: int = 3,
+        num_block_features: int = 16,
+        num_block_convs: int = 4,
+    ) -> None:
+
+        super().__init__(input_dims, num_blocks, num_block_features, num_block_convs)
+
+        # Linear layer for ligand pose prediction
+        self.lig_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "lig_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+        # Linear layer for flexible residues pose prediction
+        self.flex_pose = nn.Sequential(
+            OrderedDict(
+                [
+                    (
+                        "flex_pose_output",
+                        nn.Linear(in_features=self.features_out_size, out_features=2),
+                    )
+                ]
+            )
+        )
+
+    def forward(self, x):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and flexible residues pose prediction
+
+        Notes
+        -----
+        The pose score is the log softmax of the output of the last linear layer.
+        """
+        x = self.features(x)
+
+        # Reshape based on number of channels
+        # Global max pooling reduced spatial dimensions to single value
+        x = x.view(-1, self.features_out_size)
+
+        lig_pose_raw = self.lig_pose(x)
+        lig_pose_log = F.log_softmax(lig_pose_raw, dim=1)
+
+        flex_pose_raw = self.flex_pose(x)
+        flex_pose_log = F.log_softmax(flex_pose_raw, dim=1)
+
+        return lig_pose_log, flex_pose_log
 
 
 class HiResPose(nn.Module):
@@ -913,13 +1220,16 @@ class HiResPose(nn.Module):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
         """
         x = self.features(x)
-
-        print("FEATURES SHAPE:", x.shape)
 
         # Reshape based on number of channels
         # Global max pooling reduced spatial dimensions to single value
@@ -1047,6 +1357,11 @@ class HiResAffinity(nn.Module):
         x: torch.Tensor
             Input tensor
 
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            Log probabilities for ligand pose and affinity prediction
+
         Notes
         -----
         The pose score is the log softmax of the output of the last linear layer.
@@ -1066,13 +1381,91 @@ class HiResAffinity(nn.Module):
         return pose_log, affinity.squeeze(-1)
 
 
+Model = namedtuple("Model", ["model", "affinity", "flex"])
+
+# Key: model name, affinity, flexible residues
 models_dict = {
-    ("default2017", False): Default2017Pose,
-    ("default2017", True): Default2017Affinity,
-    ("default2018", False): Default2018Pose,
-    ("default2018", True): Default2018Affinity,
-    ("dense", False): DensePose,
-    ("dense", True): DenseAffinity,
-    ("hires_pose", True): HiResPose,
-    ("hires_affinity", True): HiResAffinity,
+    Model("default2017", False, False): Default2017Pose,
+    Model("default2017", True, False): Default2017Affinity,
+    Model("default2017", False, True): Default2017Flex,
+    Model("default2018", False, False): Default2018Pose,
+    Model("default2018", True, False): Default2018Affinity,
+    Model("default2018", False, True): Default2018Flex,
+    Model("dense", False, False): DensePose,
+    Model("dense", True, False): DenseAffinity,
+    Model("dense", False, True): DenseFlex,
+    Model("hires_pose", True, False): HiResPose,
+    Model("hires_affinity", True, False): HiResAffinity,
 }
+
+
+class GNINAModelEnsemble(nn.Module):
+    """
+    Ensemble of GNINA models.
+
+    Parameters
+    ----------
+    models: List[nn.Module]
+        List of models to use in the ensemble
+
+    Notes
+    -----
+    Assume models perform only pose AND affinity prediction.
+
+    Modules are stored in :code:`nn.ModuleList` so that they are properly registered.
+    """
+
+    def __init__(self, models: List[nn.Module]):
+        super().__init__()
+
+        # Check that all models allow both pose and affinity predictions
+        # These are the only models supported by GNINA so far
+        for m in models:
+            assert (
+                isinstance(m, Default2017Affinity)
+                or isinstance(m, Default2018Affinity)
+                or isinstance(m, DenseAffinity)
+            )
+
+        # nn.ModuleList allows to register the different modules
+        # This makes things like .to(device) apply to all modules
+        self.models = nn.ModuleList(models)
+
+    def forward(self, x: torch.Tensor):
+        """
+        Parameters
+        ----------
+        x: torch.Tensor
+            Input tensor
+
+        Returns
+        -------
+        Tuple[torch.tensor, torch.tensor, torch.tensor],
+            Logarithm of the pose score, affinity prediction (average) and affinity
+            variance
+
+        Notes
+        -----
+        For pose prediction, the average has to be performed on the scores, not theeir
+        logarithm (returned by the model). In order to be consistent with everywhere
+        else (where the logarighm of the prediction is returned), here we compute the
+        score (by exponentating), compute the average, and finally return the logarithm
+        of the computed average.
+        """
+        predictions = [model(x) for model in self.models]
+
+        # map(list, zip(*predictions)) transform list of multi-task predictions into
+        # list of predictions for each task
+        # [(log_pose_1, affinity_1), (log_pose_2, affinity_2), ...] =>
+        # [[log_pose_1, log_pose_2, ...], [affinity_1, affinity_2, ...]]
+        # Suggested by @IAlibay
+        # TODO: Better way to do this?
+        log_pose_all, affinity_all = tuple(map(list, zip(*predictions)))
+
+        affinity_stacked = torch.stack(affinity_all)
+
+        log_pose_avg = torch.stack(log_pose_all).exp().mean(dim=0).log()
+        affinity_avg = affinity_stacked.mean(dim=0)
+        affinity_var = affinity_stacked.var(dim=0, unbiased=False)
+
+        return log_pose_avg, affinity_avg, affinity_var

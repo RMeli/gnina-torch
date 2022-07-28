@@ -1,0 +1,7 @@
+gnina-torch is a PyTorch implementation of the GNINA scoring function.
+
+Please consider citing the following references:
+* Ragoza et al., J. Chem. Inf. Model. 2017, 57, 4, 942–957 [method, default2017]
+* Sunseri and Koes, J. Chem. Inf. Model. 2020, 60, 3, 1079–1084 [dependency]
+* Francoeur et al., J. Chem. Inf. Model. 2020, 60, 9, 4200–4215 [default2018, dense]
+* McNutt et al., J. Cheninform. 2021, 13, 43 [default]

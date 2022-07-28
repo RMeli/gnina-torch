@@ -1,7 +1,7 @@
 """PyTorch implementation of GNINA scoring function"""
 
 # Add imports here
-# from .gnina import *
+# from .gninatorch import *
 
 # Handle versioneer
 from ._version import get_versions

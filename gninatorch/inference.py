@@ -11,8 +11,8 @@ import torch
 from ignite.engine import Events
 from ignite.handlers import Checkpoint
 
-from gnina import metrics, models, setup, training, utils
-from gnina.dataloaders import GriddedExamplesLoader
+from gninatorch import metrics, models, setup, training, utils
+from gninatorch.dataloaders import GriddedExamplesLoader
 
 
 def options(args: Optional[List[str]] = None):
@@ -45,15 +45,18 @@ def options(args: Optional[List[str]] = None):
         help="Root folder for relative paths in train files",
     )
 
-    parser.add_argument(
-        "--rotations",
-        type=int,
-        default=1,
-        help="Number of rotations to average on",
-    )
+    # parser.add_argument(
+    #     "--rotations",
+    #     type=int,
+    #     default=1,
+    #     help="Number of rotations to average on",
+    # )
 
     parser.add_argument(
         "-o", "--out_dir", type=str, default=os.getcwd(), help="Output directory"
+    )
+    parser.add_argument(
+        "--log_file", type=str, default="inference.log", help="Log file name"
     )
 
     parser.add_argument("-g", "--gpu", type=str, default="cuda:0", help="Device name")
@@ -68,6 +71,12 @@ def options(args: Optional[List[str]] = None):
         type=int,
         default=None,
         help="Affinity value position in training file",
+    )
+    parser.add_argument(
+        "--flexlabel_pos",
+        type=int,
+        default=None,
+        help="Flexible residues pose label position in training file",
     )
     parser.add_argument(
         "--ligmolcache",
@@ -99,6 +108,12 @@ def options(args: Optional[List[str]] = None):
         help="Disable CSV output",
         dest="csv",
     )
+    parser.add_argument(
+        "--no_cache",
+        action="store_false",
+        help="Disable structure caching",
+        dest="cache_structures",
+    )
 
     return parser.parse_args(args)
 
@@ -111,12 +126,14 @@ def inference(args):
     ----------
     args:
     """
+    # Affinity prediction not supported with flexible residues (and vice versa)
+    assert args.affinity_pos is None or args.flexlabel_pos is None
 
     # Create necessary directories if not already present
     os.makedirs(args.out_dir, exist_ok=True)
 
     # Define output streams for logging
-    logfile = open(os.path.join(args.out_dir, "inference.log"), "w")
+    logfile = open(os.path.join(args.out_dir, args.log_file), "w")
     if not args.silent:
         outstreams = [sys.stdout, logfile]
     else:
@@ -148,15 +165,19 @@ def inference(args):
         grid_maker=grid_maker,
         label_pos=args.label_pos,
         affinity_pos=args.affinity_pos,
+        flexlabel_pos=args.flexlabel_pos,
         random_translation=0.0,  # No random translations for inference
         random_rotation=False,  # No random rotations for inference
         device=device,
     )
 
-    affinity: bool = True if args.affinity_pos is not None else False
+    affinity: bool = args.affinity_pos is not None
+    flex: bool = args.flexlabel_pos is not None
 
     # Create model
-    model = models.models_dict[(args.model, affinity)](test_loader.dims).to(device)
+    model = models.models_dict[(args.model, affinity, flex)](test_loader.dims).to(
+        device
+    )
 
     # Compile model with TorchScript
     model = torch.jit.script(model)
@@ -169,12 +190,16 @@ def inference(args):
     # Setup metrics but do not compute losses
     allmetrics = metrics.setup_metrics(
         affinity,
+        flex,
         pose_loss=None,
         affinity_loss=None,
+        flexpose_loss=None,
         roc_auc=args.roc_auc,
         device=device,
     )
-    evaluator = training._setup_evaluator(model, allmetrics, affinity=affinity)
+    evaluator = training._setup_evaluator(
+        model, allmetrics, affinity=affinity, flex=flex
+    )
 
     results = defaultdict(list)
     metrics_inference = defaultdict(list)
@@ -221,16 +246,20 @@ def inference(args):
             stream=outstream,
         )
 
+    # Use log file name as prefix of output names
+    log_root = os.path.splitext(args.log_file)[0]
+
     if args.csv:
         pd.DataFrame(results).to_csv(
-            os.path.join(args.out_dir, "inference.csv"), float_format="%.5f"
+            os.path.join(args.out_dir, f"{log_root}_results.csv"),
+            float_format="%.5f",
         )
 
         for key, value in evaluator.state.metrics.items():
             metrics_inference[key].append(value)
 
         pd.DataFrame(metrics_inference).to_csv(
-            os.path.join(args.out_dir, "metrics_inference.csv"),
+            os.path.join(args.out_dir, f"{log_root}_metrics.csv"),
             float_format="%.5f",
             index=False,
         )

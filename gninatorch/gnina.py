@@ -96,6 +96,11 @@ def _load_gnina_model_file(
     num_voxels: int
         Number of voxels per grid dimension
 
+    Raises
+    ------
+    ValueError
+        if model name is unknown
+
     Note
     ----
     All GNINA default models perform both pose prediction and binding affinity
@@ -217,19 +222,6 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument("--dimension", type=float, default=23.5, help="Grid dimension")
     parser.add_argument("--resolution", type=float, default=0.5, help="Grid resolution")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
-
-    parser.add_argument(
-        "--ligmolcache",
-        type=str,
-        default="",
-        help=".molcache2 file for ligands",
-    )
-    parser.add_argument(
-        "--recmolcache",
-        type=str,
-        default="",
-        help=".molcache2 file for receptors",
-    )
 
     parser.add_argument(
         "--no_cache",

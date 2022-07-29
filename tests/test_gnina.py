@@ -133,13 +133,13 @@ def test_gnina_model_prediction(
 
     # Check that scores sum to one
     assert torch.allclose(
-        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
+        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-5
     )
 
     score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
+    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-5)
 
 
 @pytest.mark.parametrize(
@@ -216,16 +216,16 @@ def test_gnina_model_prediction_ensemble(
     assert affinity_var.shape == (3,)
 
     assert torch.allclose(
-        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
+        torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-5
     )
 
     score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
+    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-5)
 
     # Compare 1-affinity_var because variance is expected to be small
-    assert np.allclose(1 - affinity_var.cpu().numpy(), 1 - CNNvariance, atol=1e-6)
+    assert np.allclose(1 - affinity_var.cpu().numpy(), 1 - CNNvariance, atol=1e-5)
 
 
 @pytest.mark.parametrize(
@@ -275,7 +275,7 @@ def test_gnina(
     # CI sometimes fail with 0.43468 instead of 0.43467
     # atol reduced to 1e-5 to avoid this random failure (numerical errors)
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity, CNNaffinity, atol=1e-6)
+    assert np.allclose(affinity, CNNaffinity, atol=1e-5)
 
 
 @pytest.mark.parametrize(
@@ -344,8 +344,8 @@ def test_gnina_ensemble(
     variance = np.array([float(s) for s in variance_re])
 
     assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity, CNNaffinity, atol=1e-6)
-    assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-6)
+    assert np.allclose(affinity, CNNaffinity, atol=1e-5)
+    assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-5)
 
 
 def test_header(capsys):

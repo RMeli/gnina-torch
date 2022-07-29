@@ -10,19 +10,26 @@ PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring functi
 
 If you are using `gnina-torch`, please consider citing the following references:
 
-> Protein–Ligand Scoring with Convolutional Neural Networks,
+> Protein-Ligand Scoring with Convolutional Neural Networks,
 > M. Ragoza, J. Hochuli, E. Idrobo, J. Sunseri, and D. R. Koes, *J. Chem. Inf. Model.* 2017, 57 (4), 942-957.
 > DOI: [10.1021/acs.jcim.6b00740](https://pubs.acs.org/doi/full/10.1021/acs.jcim.6b00740)
 
 > libmolgrid: Graphics Processing Unit Accelerated Molecular Gridding for Deep Learning Applications
-> J. Sunseri and D. R. Koes, *J. Chem. Inf. Model.* 2020, 60 (3), 1079–1084.
+> J. Sunseri and D. R. Koes, *J. Chem. Inf. Model.* 2020, 60 (3), 1079-1084.
 > DOI: [10.1021/acs.jcim.9b01145](https://pubs.acs.org/doi/10.1021/acs.jcim.9b01145)
 
 If you are using the pre-trained `default2018` and `dense` models from [GNINA](https://github.com/gnina/gnina), please consider citing the following reference as well:
 
 > Three-Dimensional Convolutional Neural Networks and a Cross-Docked Data Set for Structure-Based Drug Design,
-> P. G. Francoeur, T. Masuda, J. Sunseri, A. Jia, R. B> Iovanisci, I. Snyder, and D. R. Koes, *J. Chem. Inf. Model.* 2020, 60 (9), 4200-4215.
-> DOI: [10.1021/acs.jcim.0c00411](https://doi.org/10.1021/acs.jcim.0c00411)
+> P. G. Francoeur, T. Masuda, J. Sunseri, A. Jia, R. B. Iovanisci, I. Snyder, and D. R. Koes, *J. Chem. Inf. Model.* 2020, 60 (9), 4200-4215.
+> DOI: [10.1021/acs.jcim.0c00411](https://doi.org/10.1021/acs.jcim.0c0041)
+
+If you are using the pre-trained `default` model ensemble from [GNINA](https://github.com/gnina/gnina), please consider citing the following reference as well:
+
+> GNINA 1.0: molecular docking with deep learning,
+> A. T. McNutt, P. Francoeur, R. Aggarwal, T. Masuda, R. Meli, M. Ragoza, J. Sunseri, D. R. Koes,
+> *J. Cheminform.* 2021, 13 (43).
+> DOI: [10.1186/s13321-021-00522-2](https://doi.org/10.1186/s13321-021-00522-2)
 
 ## Installation
 
@@ -66,18 +73,11 @@ The folder `gninatorch/weights` contains pre-trained models from [GNINA](https:/
 Pre-trained GNINA models can be loaded as follows:
 
 ```python
-from gninatorch.gnina import load_gnina_model
+from gninatorch.gnina import setup_gnina_model
 
-model = load_gnina_model(MODEL_NAME)
+model = setup_gnina_model(MODEL)```
 ```
-
-Pre-trainde GNINA models can be loades as an ensemble as follows:
-
-```python
-from gninatorch.gnina import load_gnina_models
-
-model_ensemble = load_gnina_models([MODEL_NAME_1, MODEL_NAME_2, ...])
-```
+where `MODEL` corresponds to the `--cnn` argument in [GNINA](https://github.com/gnina/gnina).
 
 A single model will return `log_CNNscore` and `CNNaffinity`, while an ensemble of models will return `log_CNNscore`, `CNNaffinity`, and `CNNvariance`.
 

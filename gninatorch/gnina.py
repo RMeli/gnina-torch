@@ -31,15 +31,18 @@ def _rename(key: str) -> str:
 
     Notes
     -----
-    The PyTorch CNN laters are named similarly to the original Caffe layers. However,
+    The PyTorch CNN layers are named similarly to the original Caffe layers. However,
     the layer name is prepended with "features.". PyTorch fully connected layers are
     called differently.
 
-    The Default2017 model has slighlt different naming convention than Default2018 and
+    The Default2017 model has slight different naming convention than Default2018 and
     dense models.
     """
-    # Fix CNN layer names for all models
-    if "conv" in key:
+    # Fix CNN and dense block layer names for all models
+    if "dense_block" in key:
+        names = key.split(".")
+        return f"features.{names[0]}.blocks.{'.'.join(names[1:])}"
+    elif "conv" in key or "data_enc" in key:
         return f"features.{key}"
     # Fix default2017 model names
     elif "output_fc." in key:
@@ -100,7 +103,7 @@ def _load_gnina_model_file(
     if "default2017" in weights_file:
         # 32 channels: 18 for the ligand (ligmap.old) and 14 for the protein
         model: Union[
-            models.Default2017Affinity, models.Default2018Affinity
+            models.Default2017Affinity, models.Default2018Affinity, models.DenseAffinity
         ] = models.Default2017Affinity(
             input_dims=(35, num_voxels, num_voxels, num_voxels)
         )
@@ -111,13 +114,15 @@ def _load_gnina_model_file(
             input_dims=(28, num_voxels, num_voxels, num_voxels)
         )
     elif "dense" in weights_file:
-        # TODO: Load dense model (name conversions are a bit of a pain...)
-        raise NotImplementedError("Dense models are not supported yet.")
+        # 28 channels:
+        #   14 for the ligand (completelig) and 14 for the protein (completerec)
+        model = models.DenseAffinity(
+            input_dims=(28, num_voxels, num_voxels, num_voxels)
+        )
     else:
         raise ValueError(f"Unknown model name: {weights_file}")
 
     weights = _load_weights(weights_file)
-
     model.load_state_dict(weights)
 
     return model

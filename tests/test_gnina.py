@@ -305,12 +305,12 @@ def test_gnina(
             np.array([2.62781, 1.96368, 2.26030]),
             np.array([0.21371, 0.46775, 0.19200]),
         ),
-        #        (
-        #            "default", # GNINA default model from McNutt et al. (2021)
-        #            np.array([0.66093, 0.43392, 0.44233]),
-        #            np.array([1.82328, 1.49802, 1.54133]),
-        #            np.array([0.56169, 0.21729, 0.38851]),
-        #        )
+        (
+            "default",  # GNINA default model from McNutt et al. (2021)
+            np.array([0.66093, 0.43392, 0.44233]),
+            np.array([1.82328, 1.49802, 1.54133]),
+            np.array([0.56169, 0.21729, 0.38851]),
+        ),
     ],
 )
 def test_gnina_ensemble(

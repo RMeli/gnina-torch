@@ -276,7 +276,7 @@ def setup_gnina_model(
             "general_default2018_3",
             "dense_3",
             "crossdock_default2018",
-            "redock_default2018",
+            "redock_default2018_2",
         ]
 
         model = load_gnina_models(names)

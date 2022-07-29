@@ -52,9 +52,12 @@ def test_load_gnina_model_default2018(model_name: str):
     assert model.input_dims == (28, 48, 48, 48)
 
 
-@pytest.mark.xfail(reason="Not implemented")
-def test_load_gnina_model_dense():
-    raise NotImplementedError
+@pytest.mark.parametrize("model_name", ["dense"] + [f"dense_{i}" for i in range(1, 5)])
+def test_load_gnina_model_dense(model_name: str):
+    model = gnina.load_gnina_model(model_name)
+
+    assert isinstance(model, models.DenseAffinity)
+    assert model.input_dims == (28, 48, 48, 48)
 
 
 def test_load_gnina_model_wrong():
@@ -79,6 +82,11 @@ def test_load_gnina_model_wrong():
             "crossdock_default2018",
             np.array([0.64764, 0.43467, 0.19287]),
             np.array([1.28360, 1.27934, 1.06574]),
+        ),
+        (
+            "dense",
+            np.array([0.94850, 0.82229, 0.65933]),
+            np.array([1.93134, 1.81497, 1.56016]),
         ),
     ],
 )
@@ -128,12 +136,9 @@ def test_gnina_model_prediction(
         torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
     )
 
-    # Select scores of the negative class
-    # This is mainly because for the fictitious test systems the score is really low
-    # Small scores (close to zero) do not play nicely with np.allclose
-    negative_score = torch.exp(log_pose)[:, 0].cpu().numpy()
+    score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
-    assert np.allclose(negative_score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
     assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
 
 
@@ -157,6 +162,12 @@ def test_gnina_model_prediction(
             np.array([0.60276, 0.29299, 0.22103]),
             np.array([1.15954, 1.07318, 0.94330]),
             np.array([0.09806, 0.09105, 0.09067]),
+        ),
+        (
+            "dense",
+            np.array([0.98567, 0.62727, 0.85364]),
+            np.array([2.62781, 1.96368, 2.26030]),
+            np.array([0.21371, 0.46775, 0.19200]),
         ),
     ],
 )
@@ -208,12 +219,9 @@ def test_gnina_model_prediction_ensemble(
         torch.exp(log_pose).sum(dim=-1), torch.ones_like(affinity), atol=1e-6
     )
 
-    # Select scores of the negative class
-    # This is mainly because for the fictitious test systems the score is really low
-    # Small scores (close to zero) do not play nicely with np.allclose
-    negative_score = torch.exp(log_pose)[:, 0].cpu().numpy()
+    score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
-    assert np.allclose(negative_score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
     assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-6)
 
     # Compare 1-affinity_var because variance is expected to be small
@@ -237,6 +245,11 @@ def test_gnina_model_prediction_ensemble(
             "crossdock_default2018",
             np.array([0.64764, 0.43467, 0.19287]),
             np.array([1.28360, 1.27934, 1.06574]),
+        ),
+        (
+            "dense",
+            np.array([0.94850, 0.82229, 0.65933]),
+            np.array([1.93134, 1.81497, 1.56016]),
         ),
     ],
 )
@@ -286,6 +299,18 @@ def test_gnina(
             np.array([1.15954, 1.07318, 0.94330]),
             np.array([0.09806, 0.09105, 0.09067]),
         ),
+        (
+            "dense_ensemble",
+            np.array([0.98567, 0.62727, 0.85364]),
+            np.array([2.62781, 1.96368, 2.26030]),
+            np.array([0.21371, 0.46775, 0.19200]),
+        ),
+        #        (
+        #            "default", # GNINA default model from McNutt et al. (2021)
+        #            np.array([0.66093, 0.43392, 0.44233]),
+        #            np.array([1.82328, 1.49802, 1.54133]),
+        #            np.array([0.56169, 0.21729, 0.38851]),
+        #        )
     ],
 )
 def test_gnina_ensemble(
@@ -318,7 +343,7 @@ def test_gnina_ensemble(
     variance_re = re.findall(r"CNNvariance: (.*)", captured.out)
     variance = np.array([float(s) for s in variance_re])
 
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-6)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
     assert np.allclose(affinity, CNNaffinity, atol=1e-6)
     assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-6)
 

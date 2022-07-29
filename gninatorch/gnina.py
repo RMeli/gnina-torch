@@ -224,6 +224,19 @@ def options(args: Optional[List[str]] = None):
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size")
 
     parser.add_argument(
+        "--ligmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for ligands",
+    )
+    parser.add_argument(
+        "--recmolcache",
+        type=str,
+        default="",
+        help=".molcache2 file for receptors",
+    )
+
+    parser.add_argument(
         "--no_cache",
         action="store_false",
         help="Disable structure caching",
@@ -234,7 +247,7 @@ def options(args: Optional[List[str]] = None):
 
 
 def setup_gnina_model(
-    cnn: str, dimension: float, resolution: float
+    cnn: str = "default", dimension: float = 23.5, resolution: float = 0.5
 ) -> Union[nn.Module, bool]:
     """
     Load model or ensemble of models.
@@ -271,7 +284,7 @@ def setup_gnina_model(
             "redock_default2018_2",
         ]
 
-        model = load_gnina_models(names)
+        model = load_gnina_models(names, dimension, resolution)
     elif "ensemble" in cnn:
         ensemble = True
 
@@ -282,7 +295,7 @@ def setup_gnina_model(
         model = load_gnina_models(names, dimension, resolution)
     else:
         ensemble = False
-        model = load_gnina_model(cnn)
+        model = load_gnina_model(cnn, dimension, resolution)
 
     # Put model in evaluation mode
     # This is essential to have the BatchNorm layers in the correct state

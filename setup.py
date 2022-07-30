@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 
 import versioneer
 
-short_description = "PyTorch implementation of GNINA".split("\n")[0]
+short_description = "PyTorch implementation of GNINA scoring function".split("\n")[0]
 
 # from https://github.com/pytest-dev/pytest-runner#conditional-requirement
 needs_pytest = {"pytest", "test", "ptr"}.intersection(sys.argv)

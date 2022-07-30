@@ -22,24 +22,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    - name: Install Dependencies
-      shell: bash
-      run: |
-        python -m pip install build
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          python -m pip install build
 
-    - name: Build Package
-      shell: bash
-      run: |
-        python -m build --sdist --wheel --outdir dist/
+      - name: Build Package
+        shell: bash
+        run: |
+          python -m build --sdist --wheel --outdir dist/
 
-    - name: Publish on TestPyPI
-      # Upload to testpypi on every tag
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        password: ${{ secrets.TESTPYPI_PWD }}
-        repository_url: https://test.pypi.org/legacy/
+      - name: Publish on TestPyPI
+        # Upload to testpypi on every tag
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.TESTPYPI_PWD }}
+          repository_url: https://test.pypi.org/legacy/

@@ -1,6 +1,11 @@
 name: Deploy gninatorch
 
 on:
+  push:
+    branches:
+      - master
+    tags:
+      - "*"
   release:
     types:
       - published

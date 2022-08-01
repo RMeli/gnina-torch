@@ -44,12 +44,12 @@ setup(
     # url='http://www.my_package.com',  # Website
     install_requires=[
         "torch",
-        "pytorch-ignite",
         "molgrid",
         "numpy",
     ],
     extra_require={
         "all": [
+            "pytorch-ignite",
             "scipy",
             "pandas",
             "scikit-learn",

@@ -128,3 +128,6 @@ nohup.out
 
 # ML Tracking
 mlruns/
+
+# macOS
+.DS_Store

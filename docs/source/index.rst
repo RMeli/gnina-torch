@@ -11,6 +11,7 @@ Welcome to gninatorch's documentation!
    :caption: Contents:
 
    getting_started
+   GNINA
    api
 
 

@@ -6,6 +6,8 @@ gninatorch_ is a PyTorch_ implementation of GNINA_ scoring function, a CNN-based
 .. note::
     gninatorch_ depends on libmolgrid_, and therefore it is only available on Linux and requires a NVIDIA_ GPU.
 
+If you use gninatorch_, please consider citing the following papers: :cite:`ragoza2017protein`, :cite:`sunseri2020libmolgrid`, :cite:`francoeur2020three`, and :cite:`mcnutt2021gnina`.
+
 Installation
 ------------
 
@@ -33,8 +35,19 @@ Install gninatorch_ from source:
     python -m pip install .
 
 
-Testing the Installation
-~~~~~~~~~~~~~~~~~~~~~~~~
+Installation from PyPI
+~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    python -m pip install gninatorch
+
+.. warning::
+
+    Packages on PyPI are still WIP and should be considered experimental.
+
+Testing
+-------
 
 Run tests with pytest_ and report code coverage:
 
@@ -42,45 +55,12 @@ Run tests with pytest_ and report code coverage:
 
     pytest --cov=gninatorch
 
-Loading GNINA Models
---------------------
+.. raw:: html
 
-Thanks to `Andrew McNutt`_, who converted the original GNINA_ Caffe_ models to PyTorch_, all GNINA_ models are available in gninatorch_.
-The pre-trained models can be easily loaded as follows:
+   <hr>
 
-.. code-block:: python
-
-    from gninatorch import gnina
-
-    model, ensemble: bool = setup_gnina_model(model_name)
-
-where :code:`model_name` corresponds accepts the same values as the :code:`--cnn` argument in GNINA_.
-
-For single models we have the following possibilities:
-
-* :code:`default2017` :cite:`ragoza2017protein`
-* :code:`redock_default2018` or :code:`redock_default2018_[1-4]` :cite:`francoeur2020three`
-* :code:`general_default2018` or :code:`general_default2018_[1-4]` :cite:`francoeur2020three`
-* :code:`crossdock_default2018` or :code:`crossdock_default2018_[1-4]` :cite:`francoeur2020three`
-* :code:`dense` or :code:`dense_[1-4]` :cite:`francoeur2020three`
-
-For ensembles of 5 models we have the following possibilities:
-
-* :code:`default` (GNINA_ default model) :cite:`mcnutt2021gnina` :cite:`francoeur2020three`
-* :code:`redock_default2018_ensemble` :cite:`francoeur2020three`
-* :code:`general_default2018_ensemble` :cite:`francoeur2020three`
-* :code:`crossdock_default2018_ensemble` :cite:`francoeur2020three`
-* :code:`dense_ensemble` :cite:`francoeur2020three`
-
-Inference with GNINA Models
----------------------------
-
-Inference with the pre-trained GNINA_ models is provided by :code:`gninatorch.gnina`:
-
-.. code-block:: bash
-
-    python -m gninatorch.gnina -h
-
+.. bibliography::
+   :cited:
 
 .. _GNINA: https://github.com/gnina/gnina
 .. _conda: https://docs.conda.io/en/latest/
@@ -90,7 +70,3 @@ Inference with the pre-trained GNINA_ models is provided by :code:`gninatorch.gn
 .. _NVIDIA: https://www.nvidia.com/
 .. _PyTorch: https://pytorch.org/
 .. _pytest: https://docs.pytest.org/en/7.1.x/contents.html
-.. _`Andrew McNutt`: https://github.com/drewnutt/
-.. _Caffe: http://caffe.berkeleyvision.org/
-
-.. bibliography:: references.bib

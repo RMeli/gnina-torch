@@ -114,4 +114,4 @@ The pre-trained weights of [GNINA](https://github.com/RMeli/gnina-torch) convert
 
 ---
 
-Copyright (c) 2021, Rocco Meli
+Copyright (c) 2021-2022, Rocco Meli

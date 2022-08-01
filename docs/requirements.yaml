@@ -17,5 +17,7 @@ dependencies:
 
   - tqdm
 
+  - sphinxcontrib-bibtex
+
   - pip:
     - molgrid

@@ -2,8 +2,6 @@ name: Deploy gninatorch
 
 on:
   push:
-    branches:
-      - master
     tags:
       - "*"
   release:
@@ -13,7 +11,6 @@ on:
 defaults:
   run:
     shell: bash -l {0}
-
 
 jobs:
   build:
@@ -44,3 +41,12 @@ jobs:
           user: __token__
           password: ${{ secrets.TEST_PYPI_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
+
+      # TODO: Install package and run tests from TestPyPI
+
+      - name: Publish on TestPyPI
+        if: github.event_name == 'release' && github.event.action == 'published'
+        uses: pypa/gh-action-pypi-publish@v1.5.0
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}

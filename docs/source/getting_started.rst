@@ -1,11 +1,6 @@
 Getting Started
 ===============
 
-This page details how to get started with _gninatorch.
-
-Introduction
-------------
-
 gninatorch_ is a PyTorch_ implementation of GNINA_ scoring function, a CNN-based scoring function for molecular docking.
 
 .. note::

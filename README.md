@@ -4,6 +4,7 @@
 [![GitHub Actions Build Status](https://github.com/RMeli/gnina-torch/workflows/CI/badge.svg)](https://github.com/RMeli/gnina-torch/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/RMeli/gnina-torch/branch/main/graph/badge.svg?token=KjVkShwQ1z)](https://codecov.io/gh/RMeli/gnina-torch)
 
+[![Documentation Status](https://readthedocs.org/projects/gnina-torch/badge/?version=latest)](https://gnina-torch.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/419005477.svg)](https://zenodo.org/badge/latestdoi/419005477)
 
 PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring function.

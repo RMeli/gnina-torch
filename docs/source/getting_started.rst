@@ -1,12 +1,22 @@
 Getting Started
 ===============
 
-gninatorch_ is a PyTorch_ implementation of GNINA_ scoring function, a CNN-based scoring function for molecular docking.
+gninatorch_ is a PyTorch_ implementation of GNINA_ scoring function, a CNN-based scoring
+function for molecular docking.
 
 .. note::
-    gninatorch_ depends on libmolgrid_, and therefore it is only available on Linux and requires a NVIDIA_ GPU.
+    gninatorch_ depends on libmolgrid_, and therefore it is only available on Linux and
+    requires a NVIDIA_ GPU.
 
-If you use gninatorch_, please consider citing the following papers: :cite:`ragoza2017protein`, :cite:`sunseri2020libmolgrid`, :cite:`francoeur2020three`, and :cite:`mcnutt2021gnina`.
+If you use gninatorch_, please consider citing the following papers:
+:cite:`ragoza2017protein`, :cite:`sunseri2020libmolgrid`, :cite:`francoeur2020three`,
+and :cite:`mcnutt2021gnina`.
+
+Help
+----
+
+If you find an issue with gninatorch_, please open a `GitHub issue`_. If you have a
+question about gninatorch_, please use `GitHub Discussions`_.
 
 Installation
 ------------
@@ -71,3 +81,5 @@ Run tests with pytest_ and report code coverage:
 .. _PyTorch: https://pytorch.org/
 .. _pytest: https://docs.pytest.org/en/7.1.x/contents.html
 .. _GitHub: https://github.com/
+.. _`GitHub issue`: https://github.com/RMeli/gnina-torch/issues
+.. _`GitHub Discussions`: https://github.com/RMeli/gnina-torch/discussions

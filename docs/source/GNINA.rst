@@ -1,7 +1,8 @@
 GNINA_ Models
 =============
 
-Thanks to `Andrew McNutt`_, who converted the weights of the original Caffe_ models to PyTorch_, all GNINA_ models are available in gninatorch_.
+Thanks to `Andrew McNutt`_, who converted the weights of the original Caffe_ models to
+PyTorch_, all GNINA_ models are available in gninatorch_.
 
 You can find more information about the Caffe_ implementation at `gnina/models`_.
 
@@ -16,8 +17,9 @@ The pre-trained models can be loaded as follows:
 
     model, ensemble: bool = setup_gnina_model(model_name)
 
-where :code:`model_name` accepts the same values as the :code:`--cnn` argument in GNINA_ (see :ref:`gnina-models` and :ref:`gnina-models-ensemble`).
-:code:`ensemble` is a boolean flag that indicates whether the model is an ensemble of models or not.
+where :code:`model_name` accepts the same values as the :code:`--cnn` argument in GNINA_
+(see :ref:`gnina-models` and :ref:`gnina-models-ensemble`). :code:`ensemble` is a
+boolean flag that indicates whether the model is an ensemble of models or not.
 
 A single model returns :code:`log_CNNscore`, and :code:`CNNaffinity`:
 
@@ -31,7 +33,8 @@ A single model returns :code:`log_CNNscore`, and :code:`CNNaffinity`:
     log_CNNscore, CNNaffinity = model(x)
     CNNscore = torch.exp(log_CNNscore)
 
-An ensemble of models returns :code:`log_CNNscore`, :code:`CNNaffinity` and :code:`CNNvariance`:
+An ensemble of models returns :code:`log_CNNscore`, :code:`CNNaffinity` and
+:code:`CNNvariance`:
 
 .. code-block:: python
 
@@ -44,7 +47,8 @@ An ensemble of models returns :code:`log_CNNscore`, :code:`CNNaffinity` and :cod
     CNNscore = torch.exp(log_CNNscore)
 
 .. warning::
-    In contrast to GNINA_, which returns :code:`CNNscore`, the PyTorch models return :code:`log_CNNscore`.
+    In contrast to GNINA_, which returns :code:`CNNscore`, the PyTorch models return 
+    :code:`log_CNNscore`.
 
 .. _gnina-models:
 
@@ -72,7 +76,8 @@ The following ensembles of models are also available:
 * :code:`crossdock_default2018_ensemble` :cite:`francoeur2020three`
 * :code:`dense_ensemble` :cite:`francoeur2020three`
 
-:code:`default` is the default model used by GNINA_. See :cite:`mcnutt2021gnina` for more information.
+:code:`default` is the default model used by GNINA_. See :cite:`mcnutt2021gnina` for
+more information.
 
 .. note::
     If you are using the pre-trained models, please cite accordingly.
@@ -116,6 +121,33 @@ Inference with the pre-trained GNINA_ models is provided by :code:`gninatorch.gn
 
     python -m gninatorch.gnina -h
 
+.. note::
+    The :code:`gninatorch.gnina` script *loosely* corresponds to running GNINA_ with the
+    :code:`--score_only` argument. **Not all features are yet implemented.**
+
+The :code:`gninatorch.gnina` script takes a :code:`.types` file (a file listing
+protein-ligand pairs):
+
+.. code-block:: text
+
+    receptor_1.pdb ligand_1.sdf
+    receptor_1.pdb ligand_2.sdf
+    receptor_2.pdb ligand_1.sdf
+    ...
+
+Protein and ligand files can have the file formats supported by `Open Babel`_.
+
+Pose (:code:`CNNscore`) and binding affinity (:code:`CNNaffinity`) predictions with
+:code:`gninatorch.gnina` using the protein-ligand complexes defined in :code:`PL.types`
+and using the :code:`crossdock_default2018_ensemble` ensemble of models can be run as
+follows:
+
+.. code-block:: bash
+
+    python -m gninatorch.gnina \
+        PL.types \
+        --cnn crossdock_default2018_ensemble
+
 .. raw:: html
 
    <hr>
@@ -134,3 +166,4 @@ Inference with the pre-trained GNINA_ models is provided by :code:`gninatorch.gn
 .. _`Andrew McNutt`: https://github.com/drewnutt/
 .. _Caffe: http://caffe.berkeleyvision.org/
 .. _`gnina/models`: https://github.com/gnina/models
+.. _`Open Babel`: https://openbabel.org/wiki/Main_Page

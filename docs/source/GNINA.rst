@@ -1,14 +1,14 @@
 GNINA_ Models
 =============
 
-Thanks to `Andrew McNutt`_, who converted the original Caffe_ models to PyTorch_, all GNINA_ models are available in gninatorch_.
+Thanks to `Andrew McNutt`_, who converted the weights of the original Caffe_ models to PyTorch_, all GNINA_ models are available in gninatorch_.
 
 You can find more information about the Caffe_ implementation at `gnina/models`_.
 
 Loading GNINA_ Models
 ---------------------
 
-The pre-trained models can be easily loaded as follows:
+The pre-trained models can be loaded as follows:
 
 .. code-block:: python
 
@@ -16,12 +16,40 @@ The pre-trained models can be easily loaded as follows:
 
     model, ensemble: bool = setup_gnina_model(model_name)
 
-where :code:`model_name` corresponds accepts the same values as the :code:`--cnn` argument in GNINA_.
-
+where :code:`model_name` accepts the same values as the :code:`--cnn` argument in GNINA_ (see :ref:`gnina-models` and :ref:`gnina-models-ensemble`).
 :code:`ensemble` is a boolean flag that indicates whether the model is an ensemble of models or not.
+
+A single model returns :code:`log_CNNscore`, and :code:`CNNaffinity`:
+
+.. code-block:: python
+
+    assert ensemble == False
+
+    #  Grid based-representation of protein-ligand binding site
+    # x : torch.Tensor
+
+    log_CNNscore, CNNaffinity = model(x)
+    CNNscore = torch.exp(log_CNNscore)
+
+An ensemble of models returns :code:`log_CNNscore`, :code:`CNNaffinity` and :code:`CNNvariance`:
+
+.. code-block:: python
+
+    assert ensemble == True
+
+    #  Grid based-representation of protein-ligand binding site
+    # x : torch.Tensor
+
+    log_CNNscore, CNNaffinity, CNNvariance = model(x)
+    CNNscore = torch.exp(log_CNNscore)
 
 .. warning::
     In contrast to GNINA_, which returns :code:`CNNscore`, the PyTorch models return :code:`log_CNNscore`.
+
+.. _gnina-models:
+
+Supported GNINA Models
+~~~~~~~~~~~~~~~~~~~~~~
 
 The following models are provided:
 
@@ -31,7 +59,12 @@ The following models are provided:
 * :code:`crossdock_default2018` or :code:`crossdock_default2018_[1-4]` :cite:`francoeur2020three`
 * :code:`dense` or :code:`dense_[1-4]` :cite:`francoeur2020three`
 
-The following ensembles of models are also provided:
+.. _gnina-models-ensemble:
+
+Supported GNINA Ensembles of Models
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The following ensembles of models are also available:
 
 * :code:`default` (GNINA_ default model) :cite:`mcnutt2021gnina` :cite:`francoeur2020three`
 * :code:`redock_default2018_ensemble` :cite:`francoeur2020three`
@@ -53,7 +86,7 @@ You can build your own ensemble of models as follows:
 
     from gninatorch import gnina
 
-    model = gnina.setup_gnina_models([model_name1, model_name2, ...])
+    model = gnina.load_gnina_models([model_name1, model_name2, ...])
 
 The :code:`default` model used by GNINA_ corresponds to the following ensemble:
 
@@ -71,7 +104,8 @@ The :code:`default` model used by GNINA_ corresponds to the following ensemble:
 
     model = gnina.load_gnina_models(names)
 
-The :code:`default` optimises accuracy and inference speed. See :cite:`mcnutt2021gnina` for more information.
+The :code:`default` model is chosen to optimise accuracy and inference speed.
+See :cite:`mcnutt2021gnina` for more information.
 
 Inference with GNINA_ Models
 ----------------------------

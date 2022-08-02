@@ -14,14 +14,14 @@ Installation
 Installation from Source
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Clone the repository from GitHub:
+Clone the repository from GitHub_:
 
 .. code-block:: bash
 
     git clone https://github.com/RMeli/gnina-torch.git
     cd gnina-torch
 
-Create conda_ or mamba_ environment with all the dependencies:
+Create a conda_ or mamba_ environment with all the dependencies:
 
 .. code-block:: bash
 
@@ -70,3 +70,4 @@ Run tests with pytest_ and report code coverage:
 .. _NVIDIA: https://www.nvidia.com/
 .. _PyTorch: https://pytorch.org/
 .. _pytest: https://docs.pytest.org/en/7.1.x/contents.html
+.. _GitHub: https://github.com/

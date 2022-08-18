@@ -44,7 +44,7 @@ jobs:
 
       # TODO: Install package and run tests from TestPyPI
 
-      - name: Publish on TestPyPI
+      - name: Publish on PyPI
         if: github.event_name == 'release' && github.event.action == 'published'
         uses: pypa/gh-action-pypi-publish@v1.5.0
         with:

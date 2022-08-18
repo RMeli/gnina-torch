@@ -128,7 +128,7 @@ class GriddedExamplesLoader:
         self.grid_maker.forward(
             batch,
             grids,
-            random_translation=self.random_rotation,
+            random_translation=self.random_translation,
             random_rotation=self.random_rotation,
         )
 

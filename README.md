@@ -11,6 +11,19 @@ PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring functi
 
 ## References
 
+```
+@software{
+  gninatorch_2022,
+  author = {Meli, Rocco and McNutt, Andrew},
+  doi = {10.5281/zenodo.6943066},
+  month = {7},
+  title = {{gninatorch}},
+  url = {https://github.com/RMeli/gnina-torch},
+  version = {0.0.1},
+  year = {2022}
+}
+```
+
 If you are using `gnina-torch`, please consider citing the following references:
 
 > Protein-Ligand Scoring with Convolutional Neural Networks,

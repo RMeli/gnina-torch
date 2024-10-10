@@ -9,7 +9,7 @@
 
 PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring function.
 
-> !warning
+> ! warning
 > [GNINA version `1.3`] changed the deep learning backend from Caffe to PyTorch. Therefore, PyTorch models are now nativaly supported by [GNINA]().
 > Using [GNINA] has the advantage that the models can be used directly within the docking pipeline, instead of being used for post-processing.
 > The `gnina-torch` project is no longer under active development.

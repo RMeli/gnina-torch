@@ -883,7 +883,7 @@ def training(args):
     if args.lr_dynamic:
         torch_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            mode="max",
+            mode="min",
             factor=args.lr_reduce,
             patience=args.lr_patience,
             min_lr=args.lr_min,

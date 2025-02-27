@@ -14,9 +14,9 @@ import numpy as np
 import pandas as pd
 import torch
 from ignite.contrib.handlers import ProgressBar
-from ignite.contrib.handlers.mlflow_logger import MLflowLogger, global_step_from_engine
 from ignite.engine import Engine, Events
 from ignite.handlers import Checkpoint, timing
+from ignite.handlers.mlflow_logger import MLflowLogger, global_step_from_engine
 from torch import nn, optim
 
 from gninatorch import metrics, setup, utils

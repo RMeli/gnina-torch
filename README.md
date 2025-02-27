@@ -9,10 +9,8 @@
 
 PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring function.
 
-> [!WARNING]
-> [GNINA version `1.3`](https://github.com/gnina/gnina/releases/tag/v1.3) changed the deep learning backend from Caffe to PyTorch. Therefore, PyTorch models are now nativaly supported by [GNINA](https://github.com/gnina/gnina).
-> Using [GNINA](https://github.com/gnina/gnina/releases/tag/v1.3) has the advantage that the models can be used directly within the docking pipeline, instead of being used for post-processing.
-> The `gnina-torch` project is no longer under active development.
+> [!tip]
+> [GNINA version `1.3`](https://github.com/gnina/gnina/releases/tag/v1.3) changed the deep learning backend from Caffe to PyTorch. Therefore, PyTorch models are now nativaly supported by [GNINA](https://github.com/gnina/gnina). The [GNINA `README.md`](https://github.com/gnina/gnina/tree/2eb9c411e10ac891ee179e0161149035fae84c57?tab=readme-ov-file#training) explains how to obtain a GNINA-usable model from a PyTorch model. The advantage of having your model available to GNINA is that it can be used in the docking pipeline.
 
 ## References
 

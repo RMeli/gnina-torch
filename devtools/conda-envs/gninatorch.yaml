@@ -16,7 +16,7 @@ dependencies:
   - ignite
   - torchvision
 
-  - mlflow<2.16
+  - mlflow
 
   - scikit-learn>=1.0
 

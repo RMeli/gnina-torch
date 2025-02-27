@@ -1,23 +1,20 @@
 name: gninatorch
 channels:
   - conda-forge
-  - pytorch
 dependencies:
   - pip
-
   - numpy
 
-  - pytorch
-  - ignite
-  - torchvision
-
-  - mlflow
-  - scikit-learn>=1.0
+  - mlflow<2.16
+  - scikit-learn
 
   - tqdm
 
   - pip:
     - molgrid
+    - pytorch
+    - torchvision
+    - pytorch-ignite
 
   # devtools
   - pytest

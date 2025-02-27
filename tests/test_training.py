@@ -165,9 +165,6 @@ def test_training_pose_and_affinity_with_test(trainfile, dataroot, tmpdir, devic
 
 
 def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, capsys):
-    # Do not shuffle examples randomly when loading the batch
-    # Do not randomly rotate or translate the examples
-    # This ensures reproducibility
     args = training.options(
         [
             trainfile,

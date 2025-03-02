@@ -183,7 +183,7 @@ def inference(args):
     model = torch.jit.script(model)
 
     # Load checkpoint
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    checkpoint = torch.load(args.checkpoint, map_location=device, weights_only=True)
     Checkpoint.load_objects(to_load={"model": model}, checkpoint=checkpoint)
 
     # TODO: Allow prediction for systems without known pose or affinity

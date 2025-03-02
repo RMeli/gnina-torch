@@ -165,8 +165,6 @@ def test_training_pose_and_affinity_with_test(trainfile, dataroot, tmpdir, devic
 
 
 def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, capsys):
-    # Do not shuffle examples randomly when loading the batch
-    # This ensures reproducibility
     args = training.options(
         [
             trainfile,
@@ -175,6 +173,9 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
             "-d",
             dataroot,
             "--no_shuffle",
+            "--no_random_rotation",
+            "--random_translation",
+            "0.0",
             "--batch_size",
             "1",
             "--test_every",
@@ -204,6 +205,7 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
     # Check that the learning rate changes during training
     # TODO: Store learning rate internally and check the cache instead
     captured = capsys.readouterr()
+    print(captured.out)
     assert "Learning rate: 0.1" in captured.out  # Initial learning rate
     assert "Learning rate: 0.01" in captured.out  # Updated learning rate
     assert "Learning rate: 0.001" in captured.out  # Updated learning rate

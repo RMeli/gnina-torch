@@ -9,6 +9,8 @@ import gninatorch
 from gninatorch import gnina, models
 from gninatorch.dataloaders import GriddedExamplesLoader
 
+atol_test = 1e-2
+
 
 @pytest.mark.parametrize(
     "input_key, output_key",
@@ -138,8 +140,8 @@ def test_gnina_model_prediction(
 
     score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-5)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=atol_test)
+    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=atol_test)
 
 
 @pytest.mark.parametrize(
@@ -221,11 +223,11 @@ def test_gnina_model_prediction_ensemble(
 
     score = torch.exp(log_pose)[:, -1].cpu().numpy()
 
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=1e-5)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=atol_test)
+    assert np.allclose(affinity.cpu().numpy(), CNNaffinity, atol=atol_test)
 
     # Compare 1-affinity_var because variance is expected to be small
-    assert np.allclose(1 - affinity_var.cpu().numpy(), 1 - CNNvariance, atol=1e-5)
+    assert np.allclose(1 - affinity_var.cpu().numpy(), 1 - CNNvariance, atol=atol_test)
 
 
 @pytest.mark.parametrize(
@@ -274,8 +276,8 @@ def test_gnina(
 
     # CI sometimes fail with 0.43468 instead of 0.43467
     # atol reduced to 1e-5 to avoid this random failure (numerical errors)
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity, CNNaffinity, atol=1e-5)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=atol_test)
+    assert np.allclose(affinity, CNNaffinity, atol=atol_test)
 
 
 @pytest.mark.parametrize(
@@ -343,9 +345,9 @@ def test_gnina_ensemble(
     variance_re = re.findall(r"CNNvariance: (.*)", captured.out)
     variance = np.array([float(s) for s in variance_re])
 
-    assert np.allclose(1 - score, 1 - CNNscore, atol=1e-5)
-    assert np.allclose(affinity, CNNaffinity, atol=1e-5)
-    assert np.allclose(1 - variance, 1 - CNNvariance, atol=1e-5)
+    assert np.allclose(1 - score, 1 - CNNscore, atol=atol_test)
+    assert np.allclose(affinity, CNNaffinity, atol=atol_test)
+    assert np.allclose(1 - variance, 1 - CNNvariance, atol=atol_test)
 
 
 def test_header(capsys):

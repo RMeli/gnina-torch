@@ -147,7 +147,6 @@ def inference(args):
     if args.seed is not None:
         molgrid.set_random_seed(args.seed)
         torch.manual_seed(args.seed)
-        torch.use_deterministic_algorithms(True)
         np.random.seed(args.seed)
 
     # Set device

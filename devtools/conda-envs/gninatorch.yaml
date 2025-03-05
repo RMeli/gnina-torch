@@ -12,11 +12,11 @@ dependencies:
   - pandas
 
   - cudatoolkit=11.3
-  - pytorch=1.11
+  - pytorch
   - ignite
   - torchvision
 
-  - mlflow
+  - mlflow<2.16
 
   - scikit-learn>=1.0
 

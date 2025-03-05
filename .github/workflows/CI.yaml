@@ -44,7 +44,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
         environment-file: devtools/conda-envs/gninatorch-CI.yaml
         mamba-version: "*"
-        channels: conda-forge,pytorch
+        channels: pytorch,conda-forge
         channel-priority: true
         activate-environment: gninatorch
         auto-update-conda: false

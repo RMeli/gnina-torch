@@ -15,6 +15,23 @@ PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring functi
 ## References
 
 ```
+@article{
+  McNutt2025,
+  author={McNutt, Andrew T.
+          and Li, Yanjing
+          and Meli, Rocco
+          and Aggarwal, Rishal
+          and Koes, David Ryan},
+  title={GNINA 1.3: the next increment in molecular docking with deep learning},
+  journal={Journal of Cheminformatics},
+  year={2025},
+  volume={17},
+  number={1},
+  pages={28},
+  issn={1758-2946},
+  doi={10.1186/s13321-025-00973-x},
+}
+
 @software{
   gninatorch_2022,
   author = {Meli, Rocco and McNutt, Andrew},
@@ -22,7 +39,7 @@ PyTorch implementation of [GNINA](https://github.com/gnina/gnina) scoring functi
   month = {7},
   title = {{gninatorch}},
   url = {https://github.com/RMeli/gnina-torch},
-  version = {0.0.1},
+  version = {0.0.2},
   year = {2022}
 }
 ```

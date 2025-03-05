@@ -1,7 +1,7 @@
 name: gninatorch
 channels:
-  - conda-forge
   - pytorch
+  - conda-forge
 dependencies:
   - python
   - pip

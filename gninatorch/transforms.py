@@ -14,7 +14,7 @@ import torch
 
 
 def output_transform_select_log_pose(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select pose :code:`log_softmax` output and labels from output dictionary.
@@ -43,7 +43,7 @@ def output_transform_select_log_pose(
 
 
 def output_transform_select_pose(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select pose :code:`softmax` output and labels from output dictionary.
@@ -73,7 +73,7 @@ def output_transform_select_pose(
 
 
 def output_transform_select_affinity(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select predicted affinities output and experimental (target) affinities from output
@@ -100,7 +100,7 @@ def output_transform_select_affinity(
 
 
 def output_transform_select_affinity_abs(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select predicted affinities (in absolute value) and experimental (target) affinities
@@ -156,7 +156,7 @@ def output_transform_ROC(output) -> Tuple[torch.Tensor, torch.Tensor]:
 
 
 def output_transform_select_log_flex(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select flexible residues pose :code:`log_softmax` output and labels from output
@@ -186,7 +186,7 @@ def output_transform_select_log_flex(
 
 
 def output_transform_select_flex(
-    output: Dict[str, torch.Tensor]
+    output: Dict[str, torch.Tensor],
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     Select flexible residues pose :code:`softmax` output and labels from output

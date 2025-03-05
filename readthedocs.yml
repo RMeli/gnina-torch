@@ -4,6 +4,6 @@ sphinx:
 build:
   os: ubuntu-22.04
   tools:
-    python: "mambaforge-24.11"
+    python: "mambaforge-23.11"
 conda:
   environment: docs/requirements.txt

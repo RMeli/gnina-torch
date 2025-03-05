@@ -180,7 +180,7 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
             "--test_every",
             "1",
             "--iterations",
-            "5",
+            "10",
             "-o",
             str(tmpdir),
             "-g",
@@ -219,8 +219,8 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
     df_train = pd.read_csv(fname_train_metrics)
     df_test = pd.read_csv(fname_test_metrics)
 
-    assert len(df_train) == 5
-    assert len(df_test) == 5
+    assert len(df_train) == 10
+    assert len(df_test) == 10
 
 
 def test_training_flexposepose_with_test(trainfile, dataroot, tmpdir, device):

@@ -73,7 +73,7 @@ def _load_weights(weights_file: str) -> OrderedDict:
     OrderedDict
         Dictionary of weights (renamed according to PyTorch layer names)
     """
-    weights = torch.load(weights_file)
+    weights = torch.load(weights_file, weights_only=True)
 
     # Rename Caffe layers according to PyTorch names defined in gninatorch.models
     weights_renamed = OrderedDict(

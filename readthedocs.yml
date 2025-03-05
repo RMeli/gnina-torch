@@ -6,4 +6,4 @@ build:
   tools:
     python: "mambaforge-23.11"
 conda:
-  environment: docs/requirements.txt
+  environment: docs/requirements.yaml

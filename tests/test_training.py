@@ -180,7 +180,7 @@ def test_training_lr_scheduler_with_test(trainfile, dataroot, tmpdir, device, ca
             "--test_every",
             "1",
             "--iterations",
-            "5",
+            "10",
             "-o",
             str(tmpdir),
             "-g",

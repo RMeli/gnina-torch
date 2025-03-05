@@ -1,6 +1,5 @@
 name: gninatorch
 channels:
-  - pytorch
   - conda-forge
 dependencies:
   - python
@@ -11,9 +10,8 @@ dependencies:
   - scipy
   - pandas
 
-  - cudatoolkit=11.3
-  - pytorch
-  - ignite
+  - pytorch-gpu
+  - pytorch-ignite
   - torchvision
 
   - mlflow<2.16

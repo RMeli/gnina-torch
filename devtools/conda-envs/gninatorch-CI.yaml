@@ -1,14 +1,13 @@
 name: gninatorch
 channels:
-  - pytorch
   - conda-forge
 dependencies:
   - pip
 
   - numpy
 
-  - pytorch
-  - ignite
+  - pytorch-cpu
+  - pytorch-ignite
   - torchvision
 
   - mlflow<2.16

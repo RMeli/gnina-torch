@@ -25,10 +25,10 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.11"]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Infos
       shell: bash
@@ -39,12 +39,12 @@ jobs:
 
 
     # More info on options: https://github.com/conda-incubator/setup-miniconda
-    - uses: conda-incubator/setup-miniconda@v2.1.1
+    - uses: conda-incubator/setup-miniconda@v3
       with:
         python-version: ${{ matrix.python-version }}
         environment-file: devtools/conda-envs/gninatorch-CI.yaml
         mamba-version: "*"
-        channels: conda-forge,pytorch
+        channels: pytorch,conda-forge
         channel-priority: true
         activate-environment: gninatorch
         auto-update-conda: false
@@ -69,8 +69,8 @@ jobs:
         pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
 
     - name: CodeCov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         flags: unittests
         name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}

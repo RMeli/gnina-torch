@@ -1,7 +1,6 @@
 name: docs
 channels:
   - conda-forge
-  - pytorch
 dependencies:
   - python
   - pip
@@ -9,15 +8,16 @@ dependencies:
   - numpy
   - pandas
 
-  - pytorch
-  - ignite
+  - pytorch-cpu
+  - pytorch-ignite
 
-  - mlflow
+  - mlflow<2.16
   - scikit-learn>=1.0
 
   - tqdm
 
   - sphinxcontrib-bibtex
+  - sphinx_rtd_theme
 
   - pip:
     - molgrid

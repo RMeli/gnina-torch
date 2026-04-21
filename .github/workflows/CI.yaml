@@ -48,12 +48,15 @@ jobs:
 
             - name: Install package
               run: |
+                  uv venv --python ${{ matrix.python-version }}
+                  echo "$PWD/.venv/bin" >> $GITHUB_PATH
+                  echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
                   uv pip install -e ".[all,test]"
                   uv pip list
 
             - name: Run tests
               run: |
-                  uv run pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
+                  pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
 
             - name: CodeCov
               uses: codecov/codecov-action@v5

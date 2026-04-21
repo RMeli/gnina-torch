@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gninatorch"
+description = "PyTorch implementation of GNINA scoring function"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Rocco Meli", email = "rocco.meli@biodtp.ox.ac.uk" }]
+requires-python = ">=3.12"
+dependencies = [
+    "torch",
+    "molgrid",
+    "numpy",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+all = [
+    "pytorch-ignite",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "tqdm",
+    "mlflow",
+]
+test = [
+    "pytest>=6.0",
+    "pytest-xdist>=2.5",
+    "pytest-cov>=3.0",
+]
+doc = [
+    "sphinx",
+    "sphinx_rtd_theme",
+]
+
+[tool.setuptools_scm]
+write_to = "gninatorch/_version.py"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests/"]
+
+[tool.coverage.run]
+omit = [
+    "*/tests/*",
+    "gninatorch/_version.py",
+    "gninatorch/weights/",
+]
+
+[tool.coverage.report]
+omit = [
+    "*/tests/*",
+    "gninatorch/_version.py",
+    "gninatorch/weights/",
+]
+exclude_lines = [
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+[tool.isort]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+skip = ["examples/", "gninatorch/weights/"]
+
+[tool.mypy]
+files = "gninatorch"
+ignore_missing_imports = true
+exclude = ["examples/", "gninatorch/weights/"]
+
+# Note: flake8 does not natively read pyproject.toml.
+# Install the `flake8-pyproject` plugin to enable this section.
+[tool.flake8]
+ignore = ["E203", "E266", "E501", "W503", "C901"]
+max-line-length = 88
+max-complexity = 18
+select = ["B", "C", "E", "F", "W", "T4"]
+exclude = ["versioneer.py", "examples", "gninatorch/weights/"]

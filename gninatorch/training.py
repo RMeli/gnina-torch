@@ -887,7 +887,6 @@ def training(args):
             factor=args.lr_reduce,
             patience=args.lr_patience,
             min_lr=args.lr_min,
-            verbose=False,
         )
 
     # Elapsed time timer, training time only

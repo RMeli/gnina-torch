@@ -40,23 +40,17 @@ jobs:
                   ulimit -a
 
             - name: Install uv
-              uses: astral-sh/setup-uv@v4
+              uses: astral-sh/setup-uv@v7
               with:
                   python-version: ${{ matrix.python-version }}
                   enable-cache: true
                   cache-dependency-glob: "pyproject.toml"
 
             - name: Install package
-              run: |
-                  uv venv --python ${{ matrix.python-version }}
-                  echo "$PWD/.venv/bin" >> $GITHUB_PATH
-                  echo "VIRTUAL_ENV=$PWD/.venv" >> $GITHUB_ENV
-                  uv pip install -e ".[all,test]"
-                  uv pip list
+              run: uv sync --extra all --extra test
 
             - name: Run tests
-              run: |
-                  pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
+              run: uv run pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
 
             - name: CodeCov
               uses: codecov/codecov-action@v5

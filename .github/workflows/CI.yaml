@@ -48,12 +48,12 @@ jobs:
 
             - name: Install package
               run: |
-                  uv pip install --system -e ".[all,test]"
-                  uv pip list --system
+                  uv pip install -e ".[all,test]"
+                  uv pip list
 
             - name: Run tests
               run: |
-                  pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
+                  uv run pytest -v --cov=gninatorch --cov-report=xml --color=yes tests/ --nogpu
 
             - name: CodeCov
               uses: codecov/codecov-action@v5
